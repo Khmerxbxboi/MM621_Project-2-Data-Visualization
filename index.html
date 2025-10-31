@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SEA Happiness Data · Interaction Design - Data Visualization (2019)</title>
+
+  <!-- p5.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js" defer></script>
+  <!-- Your visualization (must preload image_b701a4.jpg) -->
+  <script src="sketch.js" defer></script>
+
+  <!-- Social preview (optional) -->
+  <meta name="theme-color" content="#0b0f14" />
+  <meta property="og:title" content="SEA Happiness Data · Interaction Design Data Visualization (2019)" />
+  <meta property="og:description" content="Linked bar + donut visualization for Southeast Asia (2019). Clean enterprise UX." />
+  <meta property="og:type" content="website" />
+
+  <style>
+    :root{
+      --bg-0:#0b0f14;
+      --bg-1:#12161d;
+      --fg-1:#e7eef8;
+      --fg-2:#9fb0c8;
+      --brand:#48e0a4;
+      --muted:#1f2630;
+      --radius:14px;
+      --shadow:0 10px 30px rgba(0,0,0,.35);
+    }
+
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      color:var(--fg-1);
+      background:
+        radial-gradient(1200px 600px at 20% -10%, #183044 0%, transparent 60%),
+        radial-gradient(900px 500px at 120% 20%, #1b2a3a 0%, transparent 55%),
+        var(--bg-0);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      display:flex;
+      flex-direction:column;
+      gap:16px;
+    }
+
+    /* Header */
+    header{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      padding:14px clamp(12px, 4vw, 28px);
+    }
+    .brand{display:flex; align-items:center; gap:10px; text-decoration:none; color:var(--fg-1);}
+    .brand .dot{width:10px;height:10px;border-radius:999px;background:var(--brand);box-shadow:0 0 18px var(--brand)}
+    .title{font-weight:700; letter-spacing:.2px; font-size:clamp(16px, 2.2vw, 20px);}
+    .subtitle{color:var(--fg-2); font-size:clamp(12px, 1.6vw, 14px);}
+    .back-link{
+      color:var(--fg-2); text-decoration:none; padding:10px 14px;
+      border:1px solid var(--muted); border-radius:10px;
+      background:linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.0));
+      transition: .2s ease;
+    }
+    .back-link:hover{ color:var(--fg-1); border-color:#2b3542 }
+
+    /* Stage (holds canvas) */
+    .stage{
+      position:relative;
+      padding: clamp(8px, 2vw, 16px);
+      margin: 0 clamp(8px, 3vw, 28px);
+      border-radius: var(--radius);
+      background: rgba(18,22,29,.55);
+      backdrop-filter: blur(6px);
+      box-shadow: var(--shadow);
+      overflow:hidden;
+      opacity: 0;                /* hidden until “login” */
+      transform: translateY(10px);
+      transition: opacity .35s ease, transform .35s ease;
+    }
+    .stage.ready{
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .canvas-scroller{
+      overflow-x:auto; overflow-y:hidden; -webkit-overflow-scrolling:touch;
+      border-radius: calc(var(--radius) - 4px);
+    }
+    canvas{ display:block; margin:0 auto; height:auto; max-width: 100%; }
+
+    /* Footer */
+    footer{
+      margin: 0 clamp(8px, 3vw, 28px) clamp(10px, 3vh, 20px);
+      background:var(--bg-1);
+      border:1px solid var(--muted);
+      border-radius:var(--radius);
+      box-shadow:var(--shadow);
+      padding:14px clamp(14px, 3vw, 22px);
+      display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
+      color:var(--fg-2); font-size:14px;
+    }
+    footer a{ color:var(--fg-1); text-decoration:none; }
+    footer a:hover{ color:var(--brand); }
+
+    /* Login Gate */
+    .gate{
+      position: fixed; inset: 0; z-index: 10;
+      display: grid; place-items: center;
+      background:
+        radial-gradient(1100px 600px at 15% -10%, rgba(40,80,110,.35) 0%, transparent 60%),
+        radial-gradient(900px 500px at 120% 20%, rgba(40,80,110,.25) 0%, transparent 55%),
+        rgba(7,10,14,.92);
+      opacity: 1; transition: opacity .35s ease;
+    }
+    .gate.hidden{ opacity: 0; pointer-events: none; }
+
+    .card{
+      width: min(560px, 92vw);
+      background: rgba(18,22,29,.82);
+      border: 1px solid var(--muted);
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+      padding: clamp(18px, 3vw, 26px);
+      transform: translateY(6px) scale(.98);
+      transition: transform .28s ease;
+    }
+    .gate:not(.hidden) .card{ transform: translateY(0) scale(1); }
+
+    .product{
+      display:flex; align-items:center; gap:12px; margin-bottom: 12px;
+    }
+    .product .gem{ width:14px; height:14px; border-radius:999px; background:var(--brand); box-shadow:0 0 18px var(--brand); }
+    .product .name{ font-weight:700; font-size: clamp(16px, 2.2vw, 20px); }
+    .product .tagline{ color:var(--fg-2); font-size: clamp(12px, 1.6vw, 14px); }
+
+    .form{
+      display:grid; gap:12px; margin-top: 12px;
+    }
+    .field{
+      display:grid; gap:8px;
+    }
+    label{ color:var(--fg-2); font-size: 13px; }
+    input[type="text"]{
+      width:100%; padding:12px 12px; border-radius:10px;
+      background:#0f141b; color:var(--fg-1);
+      border:1px solid var(--muted);
+      outline:none; transition:.2s ease;
+      font-size:15px;
+    }
+    input[type="text"]:focus{ border-color:#2b3542; box-shadow: 0 0 0 3px rgba(72,224,164,.12); }
+
+    .actions{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top: 2px; }
+    .btn{
+      cursor:pointer; user-select:none;
+      padding:10px 14px; border-radius:10px; border:1px solid #2b3542;
+      background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.0));
+      color:var(--fg-1); font-weight:600; letter-spacing:.2px; font-size:14px;
+      transition:.2s ease;
+    }
+    .btn:hover{ border-color:var(--brand); color:var(--brand); }
+    .hint{ color:var(--fg-2); font-size:13px; }
+
+    .error{
+      color:#ff7a7a; font-size:13px; min-height:18px;
+    }
+
+    /* Hide any legacy elements */
+    #info-panel, #data-display, .controls, .old-layout, #sort-controls { display:none !important; }
+
+    @media (max-width: 720px){
+      .subtitle{ display:none; }
+      .stage{ padding:10px; }
+      footer{ font-size:13px; gap:8px; }
+      .back-link{ padding:8px 12px; }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <a class="brand" href="#" aria-label="SEA Happiness Data Home">
+      <span class="dot"></span>
+      <div>
+        <div class="title">SEA Happiness Data · 2019</div>
+        <div class="subtitle">Interaction Design Data Visualization</div>
+      </div>
+    </a>
+    <a class="back-link" href="https://www.jayaproduction.com" target="_blank" rel="noopener">← Back to JayaProduction.com</a>
+  </header>
+
+  <!-- Login Gate -->
+  <section class="gate" id="gate" aria-label="Access Gate">
+    <div class="card" role="dialog" aria-modal="true" aria-labelledby="gateTitle">
+      <div class="product">
+        <span class="gem"></span>
+        <div>
+          <div id="gateTitle" class="name">Sign in to continue</div>
+          <div class="tagline">Classified: SEA Directorate key to access the visualization.</div>
+        </div>
+      </div>
+
+      <form class="form" id="gateForm">
+        <div class="field">
+          <label for="passphrase">SEA Access Key</label>
+          <input id="passphrase" type="text" inputmode="text" autocomplete="off"
+                 placeholder="Type: Southeast Asia" aria-describedby="keyHelp" />
+          <div id="keyHelp" class="hint">Case-insensitive · demo-only (not secure)</div>
+          <div id="error" class="error" role="alert" aria-live="polite"></div>
+        </div>
+        <div class="actions">
+          <button class="btn" id="enterBtn" type="submit">Enter</button>
+          <button class="btn" id="rememberBtn" type="button" aria-pressed="false">Remember this device</button>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <!-- Main stage -->
+  <main class="stage" id="stage" aria-label="Interaction Design Data Visualization">
+    <div class="canvas-scroller" id="app"><!-- p5 will inject a <canvas> here --></div>
+  </main>
+
+  <footer>
+    <div>© <span id="year"></span> Jaya Production · Built for modern web, optimized for touch & desktop.</div>
+    <div><a href="https://www.jayaproduction.com" target="_blank" rel="noopener">jayaproduction.com</a></div>
+  </footer>
+
+  <script>
+    // Footer year
+    document.getElementById('year').textContent = new Date().getFullYear();
+
+    // Attach p5 canvas to #app if sketch didn't explicitly parent()
+    const __attachCanvasParent = () => {
+      let tries = 0;
+      const t = setInterval(() => {
+        if (window._renderer && window._renderer.canvas) {
+          try {
+            document.getElementById('app')?.appendChild(window._renderer.canvas);
+            clearInterval(t);
+          } catch(e){ clearInterval(t); }
+        }
+        if (++tries > 40) clearInterval(t);
+      }, 100);
+    };
+    if (document.readyState === 'complete') __attachCanvasParent();
+    else window.addEventListener('load', __attachCanvasParent);
+
+    // --- Simple Gate Logic (cosmetic; not security) ---
+    const PASS = "southeast asia";
+    const gate = document.getElementById('gate');
+    const stage = document.getElementById('stage');
+    const form = document.getElementById('gateForm');
+    const input = document.getElementById('passphrase');
+    const error = document.getElementById('error');
+    const rememberBtn = document.getElementById('rememberBtn');
+
+    // Restore remembered access
+    const remembered = localStorage.getItem('sea_demo_access') === '1';
+    if (remembered) {
+      gate.classList.add('hidden');
+      stage.classList.add('ready');
+    } else {
+      // Focus the input on load
+      window.addEventListener('load', () => setTimeout(() => input?.focus(), 100));
+    }
+
+    rememberBtn.addEventListener('click', () => {
+      const pressed = rememberBtn.getAttribute('aria-pressed') === 'true';
+      rememberBtn.setAttribute('aria-pressed', (!pressed).toString());
+      rememberBtn.style.borderColor = pressed ? '#2b3542' : 'var(--brand)';
+      rememberBtn.style.color = pressed ? 'var(--fg-1)' : 'var(--brand)';
+    });
+
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const ok = (input.value || '').trim().toLowerCase() === PASS;
+      if (!ok) {
+        error.textContent = 'Incorrect key. Hint: "Southeast Asia"';
+        input.select();
+        return;
+      }
+      error.textContent = '';
+      gate.classList.add('hidden');
+      stage.classList.add('ready');
+      if (rememberBtn.getAttribute('aria-pressed') === 'true') {
+        localStorage.setItem('sea_demo_access', '1');
+      }
+    });
+
+    // Allow Enter key on input to submit
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') form.requestSubmit();
+    });
+  </script>
+
+  <!-- Accessibility note: This gate is cosmetic and not intended for real authentication. -->
+</body>
+</html>
