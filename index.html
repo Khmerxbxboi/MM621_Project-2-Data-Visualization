@@ -3,17 +3,15 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>SEA Happiness Data · Interaction Design - Data Visualization (2019)</title>
+  <title>SEA Happiness Data · Sodaro Visualization 2025</title>
 
   <!-- p5.js -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js" defer></script>
-  <!-- Your visualization (must preload image_b701a4.jpg) -->
   <script src="sketch.js" defer></script>
 
-  <!-- Social preview (optional) -->
-  <meta name="theme-color" content="#0b0f14" />
-  <meta property="og:title" content="SEA Happiness Data · Interaction Design Data Visualization (2019)" />
-  <meta property="og:description" content="Linked bar + donut visualization for Southeast Asia (2019). Clean enterprise UX." />
+  <meta name="theme-color" content="#0CAFFF" />
+  <meta property="og:title" content="Sodaro · SEA Happiness Visualization 2025" />
+  <meta property="og:description" content="Electric-blue interactive data visualization built in p5.js by Bullimalinna Sot." />
   <meta property="og:type" content="website" />
 
   <style>
@@ -22,7 +20,7 @@
       --bg-1:#12161d;
       --fg-1:#e7eef8;
       --fg-2:#9fb0c8;
-      --brand:#48e0a4;
+      --brand:#0CAFFF;   /* Sodaro blue */
       --muted:#1f2630;
       --radius:14px;
       --shadow:0 10px 30px rgba(0,0,0,.35);
@@ -34,267 +32,254 @@
       margin:0;
       color:var(--fg-1);
       background:
-        radial-gradient(1200px 600px at 20% -10%, #183044 0%, transparent 60%),
-        radial-gradient(900px 500px at 120% 20%, #1b2a3a 0%, transparent 55%),
+        radial-gradient(1200px 600px at 20% -10%, #122033 0%, transparent 60%),
+        radial-gradient(900px 500px at 120% 20%, #101a2a 0%, transparent 55%),
         var(--bg-0);
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      font-family: system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;
+      display:flex; flex-direction:column; gap:16px;
       -webkit-font-smoothing: antialiased;
       -moz-osx-font-smoothing: grayscale;
-      display:flex;
-      flex-direction:column;
-      gap:16px;
     }
 
-    /* Header */
     header{
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:12px;
-      padding:14px clamp(12px, 4vw, 28px);
+      display:flex; align-items:center; justify-content:space-between;
+      padding:14px clamp(12px,4vw,28px);
     }
-    .brand{display:flex; align-items:center; gap:10px; text-decoration:none; color:var(--fg-1);}
-    .brand .dot{width:10px;height:10px;border-radius:999px;background:var(--brand);box-shadow:0 0 18px var(--brand)}
-    .title{font-weight:700; letter-spacing:.2px; font-size:clamp(16px, 2.2vw, 20px);}
-    .subtitle{color:var(--fg-2); font-size:clamp(12px, 1.6vw, 14px);}
+    .brand{display:flex; flex-direction:column; text-decoration:none; color:var(--fg-1);}
+    .title{font-weight:700; font-size:clamp(18px,2.3vw,22px);}
+    .subtitle{color:var(--fg-2); font-size:clamp(12px,1.6vw,14px);}
     .back-link{
-      color:var(--fg-2); text-decoration:none; padding:10px 14px;
-      border:1px solid var(--muted); border-radius:10px;
-      background:linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.0));
-      transition: .2s ease;
+      color:var(--fg-2); text-decoration:none;
+      padding:10px 14px; border:1px solid var(--muted);
+      border-radius:10px; transition:.2s ease;
     }
-    .back-link:hover{ color:var(--fg-1); border-color:#2b3542 }
+    .back-link:hover{color:var(--fg-1); border-color:#2b3542;}
 
-    /* Stage (holds canvas) */
     .stage{
       position:relative;
-      padding: clamp(8px, 2vw, 16px);
-      margin: 0 clamp(8px, 3vw, 28px);
-      border-radius: var(--radius);
-      background: rgba(18,22,29,.55);
-      backdrop-filter: blur(6px);
-      box-shadow: var(--shadow);
-      overflow:hidden;
-      opacity: 0;                /* hidden until “login” */
-      transform: translateY(10px);
-      transition: opacity .35s ease, transform .35s ease;
-    }
-    .stage.ready{
-      opacity: 1;
-      transform: translateY(0);
-    }
-
-    .canvas-scroller{
-      overflow-x:auto; overflow-y:hidden; -webkit-overflow-scrolling:touch;
-      border-radius: calc(var(--radius) - 4px);
-    }
-    canvas{ display:block; margin:0 auto; height:auto; max-width: 100%; }
-
-    /* Footer */
-    footer{
-      margin: 0 clamp(8px, 3vw, 28px) clamp(10px, 3vh, 20px);
-      background:var(--bg-1);
-      border:1px solid var(--muted);
+      padding: clamp(8px,2vw,16px);
+      margin: 0 clamp(8px,3vw,28px);
       border-radius:var(--radius);
+      background:rgba(18,22,29,.55);
+      backdrop-filter:blur(6px);
       box-shadow:var(--shadow);
-      padding:14px clamp(14px, 3vw, 22px);
-      display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
-      color:var(--fg-2); font-size:14px;
+      overflow:hidden;
+      opacity:0; transform:translateY(10px);
+      transition:opacity .35s ease,transform .35s ease;
     }
-    footer a{ color:var(--fg-1); text-decoration:none; }
-    footer a:hover{ color:var(--brand); }
+    .stage.ready{opacity:1;transform:translateY(0);}
+    canvas{display:block;margin:0 auto;max-width:100%;}
+
+    footer{
+      margin:0 clamp(8px,3vw,28px) clamp(10px,3vh,20px);
+      background:var(--bg-1); border:1px solid var(--muted);
+      border-radius:var(--radius); box-shadow:var(--shadow);
+      padding:14px clamp(14px,3vw,22px);
+      display:flex; align-items:center; justify-content:space-between;
+      flex-wrap:wrap; font-size:14px; color:var(--fg-2);
+    }
+    footer a{color:var(--fg-1);text-decoration:none;}
+    footer a:hover{color:var(--brand);}
+
+    /* --- Splash (PS1-style) --- */
+    .splash{
+      position:fixed; inset:0; z-index:20;
+      display:grid; place-items:center;
+      background:radial-gradient(1600px 800px at 50% -10%, #10151d 0%, transparent 65%), #04070b;
+      animation:splashFadeOut .4s ease forwards; animation-delay:1.6s;
+    }
+    .splash.hidden{display:none;}
+    .splash .logo-big{
+      width:min(240px,42vmin); height:min(240px,42vmin);
+      object-fit:contain; border-radius:24px;
+      animation:bootSpin 1.2s ease-out,bootSettle .9s cubic-bezier(.2,.9,.2,1) .9s forwards;
+    }
+    .scanlines{
+      position:absolute; inset:0; pointer-events:none;
+      background:repeating-linear-gradient(to bottom,rgba(255,255,255,.1) 0 1px,transparent 3px 4px);
+      mix-blend-mode:overlay; animation:flicker 1.2s linear infinite; opacity:.14;
+    }
+    @keyframes bootSpin{0%{transform:scale(.7) rotate(-8deg);opacity:0}
+      40%{opacity:1}60%{transform:scale(1.06) rotate(0)}100%{transform:scale(1)}}
+    @keyframes bootSettle{from{transform:scale(1)}to{transform:scale(.96)}}
+    @keyframes splashFadeOut{to{opacity:0;pointer-events:none}}
+    @keyframes flicker{0%,100%{opacity:.14}50%{opacity:.1}}
+    @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 
     /* Login Gate */
     .gate{
-      position: fixed; inset: 0; z-index: 10;
-      display: grid; place-items: center;
-      background:
-        radial-gradient(1100px 600px at 15% -10%, rgba(40,80,110,.35) 0%, transparent 60%),
-        radial-gradient(900px 500px at 120% 20%, rgba(40,80,110,.25) 0%, transparent 55%),
-        rgba(7,10,14,.92);
-      opacity: 1; transition: opacity .35s ease;
+      position:fixed; inset:0; z-index:10;
+      display:grid; place-items:center;
+      background:radial-gradient(1100px 600px at 15% -10%,rgba(40,80,110,.35) 0%,transparent 60%),
+                 radial-gradient(900px 500px at 120% 20%,rgba(40,80,110,.25) 0%,transparent 55%),
+                 rgba(7,10,14,.92);
+      opacity:0; pointer-events:none; transition:opacity .35s ease;
     }
-    .gate.hidden{ opacity: 0; pointer-events: none; }
-
     .card{
-      width: min(560px, 92vw);
-      background: rgba(18,22,29,.82);
-      border: 1px solid var(--muted);
-      border-radius: 16px;
-      box-shadow: var(--shadow);
-      padding: clamp(18px, 3vw, 26px);
-      transform: translateY(6px) scale(.98);
-      transition: transform .28s ease;
+      width:min(560px,92vw); background:rgba(18,22,29,.82);
+      border:1px solid var(--muted); border-radius:16px; box-shadow:var(--shadow);
+      padding:clamp(18px,3vw,26px); text-align:center;
     }
-    .gate:not(.hidden) .card{ transform: translateY(0) scale(1); }
+    .auth-logo{
+      width:72px;height:72px;margin:4px auto 14px auto;
+      object-fit:contain; border-radius:18px;opacity:0;transition:opacity .35s ease;
+    }
+    .product .gem{width:10px;height:10px;border-radius:999px;background:var(--brand);}
+    .product{display:flex;justify-content:center;align-items:center;gap:10px;margin-bottom:8px;}
+    .product .name{font-weight:700;font-size:clamp(16px,2vw,20px);}
+    .tagline{color:var(--fg-2);font-size:clamp(12px,1.5vw,14px);}
+    .form{display:grid;gap:12px;margin-top:12px;}
+    label{color:var(--fg-2);font-size:13px;}
+    input[type=text]{
+      width:100%;padding:12px;border-radius:10px;background:#0f141b;color:var(--fg-1);
+      border:1px solid var(--muted);outline:none;font-size:15px;
+    }
+    input[type=text]:focus{border-color:var(--brand);box-shadow:0 0 0 3px rgba(12,175,255,.15);}
+    .actions{display:flex;justify-content:center;gap:10px;}
+    .btn{cursor:pointer;padding:10px 14px;border-radius:10px;border:1px solid #2b3542;
+      background:rgba(255,255,255,.02);color:var(--fg-1);font-weight:600;font-size:14px;transition:.2s;}
+    .btn:hover{border-color:var(--brand);color:var(--brand);}
+    .error{color:#ff7a7a;font-size:13px;min-height:18px;}
 
-    .product{
-      display:flex; align-items:center; gap:12px; margin-bottom: 12px;
-    }
-    .product .gem{ width:14px; height:14px; border-radius:999px; background:var(--brand); box-shadow:0 0 18px var(--brand); }
-    .product .name{ font-weight:700; font-size: clamp(16px, 2.2vw, 20px); }
-    .product .tagline{ color:var(--fg-2); font-size: clamp(12px, 1.6vw, 14px); }
-
-    .form{
-      display:grid; gap:12px; margin-top: 12px;
-    }
-    .field{
-      display:grid; gap:8px;
-    }
-    label{ color:var(--fg-2); font-size: 13px; }
-    input[type="text"]{
-      width:100%; padding:12px 12px; border-radius:10px;
-      background:#0f141b; color:var(--fg-1);
-      border:1px solid var(--muted);
-      outline:none; transition:.2s ease;
-      font-size:15px;
-    }
-    input[type="text"]:focus{ border-color:#2b3542; box-shadow: 0 0 0 3px rgba(72,224,164,.12); }
-
-    .actions{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top: 2px; }
-    .btn{
-      cursor:pointer; user-select:none;
-      padding:10px 14px; border-radius:10px; border:1px solid #2b3542;
-      background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.0));
-      color:var(--fg-1); font-weight:600; letter-spacing:.2px; font-size:14px;
-      transition:.2s ease;
-    }
-    .btn:hover{ border-color:var(--brand); color:var(--brand); }
-    .hint{ color:var(--fg-2); font-size:13px; }
-
-    .error{
-      color:#ff7a7a; font-size:13px; min-height:18px;
-    }
-
-    /* Hide any legacy elements */
-    #info-panel, #data-display, .controls, .old-layout, #sort-controls { display:none !important; }
-
-    @media (max-width: 720px){
-      .subtitle{ display:none; }
-      .stage{ padding:10px; }
-      footer{ font-size:13px; gap:8px; }
-      .back-link{ padding:8px 12px; }
+    @media(max-width:720px){
+      .subtitle{display:none;}
+      .stage{padding:10px;}
+      footer{font-size:13px;gap:8px;}
+      .back-link{padding:8px 12px;}
     }
   </style>
 </head>
 <body>
-
   <header>
-    <a class="brand" href="#" aria-label="SEA Happiness Data Home">
-      <span class="dot"></span>
-      <div>
-        <div class="title">SEA Happiness Data · 2019</div>
-        <div class="subtitle">Interaction Design Data Visualization</div>
-      </div>
+    <a class="brand" href="#">
+      <div class="title">SEA Happiness Data · 2019</div>
+      <div class="subtitle">Interaction Design Data Visualization</div>
     </a>
-    <a class="back-link" href="https://www.jayaproduction.com" target="_blank" rel="noopener">← Back to JayaProduction.com</a>
+    <a class="back-link" href="https://www.jayaproduction.com">← Back</a>
   </header>
 
-  <!-- Login Gate -->
-  <section class="gate" id="gate" aria-label="Access Gate">
-    <div class="card" role="dialog" aria-modal="true" aria-labelledby="gateTitle">
+  <!-- Splash -->
+  <section class="splash" id="splash">
+    <img src="sodaro_logo.png" alt="Sodaro Logo" class="logo-big" />
+    <div class="scanlines" aria-hidden="true"></div>
+  </section>
+
+  <!-- Sign-in -->
+  <section class="gate" id="gate">
+    <div class="card">
+      <img src="sodaro_logo.png" alt="Sodaro Logo" class="auth-logo" id="authLogo" />
       <div class="product">
-        <span class="gem"></span>
-        <div>
-          <div id="gateTitle" class="name">Sign in to continue</div>
-          <div class="tagline">Classified: SEA Directorate key to access the visualization.</div>
-        </div>
+        <span class="gem"></span><div id="gateTitle" class="name">Sign in to continue</div>
       </div>
+      <div class="tagline">Enter the SEA Directorate key to access visualization.</div>
 
       <form class="form" id="gateForm">
         <div class="field">
           <label for="passphrase">SEA Access Key</label>
-          <input id="passphrase" type="text" inputmode="text" autocomplete="off"
-                 placeholder="Type: Southeast Asia" aria-describedby="keyHelp" />
-          <div id="keyHelp" class="hint">Case-insensitive · demo-only (not secure)</div>
-          <div id="error" class="error" role="alert" aria-live="polite"></div>
+          <input id="passphrase" type="text" placeholder="Type: Southeast Asia" autocomplete="off" />
+          <div id="error" class="error"></div>
         </div>
         <div class="actions">
           <button class="btn" id="enterBtn" type="submit">Enter</button>
-          <button class="btn" id="rememberBtn" type="button" aria-pressed="false">Remember this device</button>
+          <button class="btn" id="rememberBtn" type="button" aria-pressed="false">Remember device</button>
         </div>
       </form>
     </div>
   </section>
 
-  <!-- Main stage -->
-  <main class="stage" id="stage" aria-label="Interaction Design Data Visualization">
-    <div class="canvas-scroller" id="app"><!-- p5 will inject a <canvas> here --></div>
+  <!-- Main Stage -->
+  <main class="stage" id="stage">
+    <div id="app"></div>
   </main>
 
   <footer>
-    <div>© <span id="year"></span> Jaya Production · Built for modern web, optimized for touch & desktop.</div>
-    <div><a href="https://www.jayaproduction.com" target="_blank" rel="noopener">jayaproduction.com</a></div>
+    <div>© <span id="year"></span> Bullimalinna Sot · Interaction Design & Interactive Art</div>
+    <div><a href="#">Built for modern web</a></div>
   </footer>
 
-  <script>
-    // Footer year
-    document.getElementById('year').textContent = new Date().getFullYear();
+<script>
+  // Footer year
+  document.getElementById("year").textContent = new Date().getFullYear();
 
-    // Attach p5 canvas to #app if sketch didn't explicitly parent()
-    const __attachCanvasParent = () => {
-      let tries = 0;
-      const t = setInterval(() => {
-        if (window._renderer && window._renderer.canvas) {
-          try {
-            document.getElementById('app')?.appendChild(window._renderer.canvas);
-            clearInterval(t);
-          } catch(e){ clearInterval(t); }
-        }
-        if (++tries > 40) clearInterval(t);
-      }, 100);
-    };
-    if (document.readyState === 'complete') __attachCanvasParent();
-    else window.addEventListener('load', __attachCanvasParent);
+  // Attach p5 canvas (safe even if sketch already parents to #app)
+  const attach = () => {
+    let tries=0;
+    const t=setInterval(()=>{
+      if(window._renderer&&window._renderer.canvas){
+        try{document.getElementById("app")?.appendChild(window._renderer.canvas);clearInterval(t);}
+        catch(e){clearInterval(t);}
+      }
+      if(++tries>40)clearInterval(t);
+    },100);
+  };
+  if(document.readyState==="complete")attach(); else window.addEventListener("load",attach);
 
-    // --- Simple Gate Logic (cosmetic; not security) ---
-    const PASS = "southeast asia";
-    const gate = document.getElementById('gate');
-    const stage = document.getElementById('stage');
-    const form = document.getElementById('gateForm');
-    const input = document.getElementById('passphrase');
-    const error = document.getElementById('error');
-    const rememberBtn = document.getElementById('rememberBtn');
+  // -------- Boot / Login logic --------
+  const PASS = "southeast asia";
+  const STORAGE_KEY = "sea_demo_access_v2";   // new key
+  const url = new URL(window.location.href);
+  const forceBoot = url.searchParams.get("boot") === "1";
+  const doReset   = url.searchParams.get("reset") === "1";
+  if (doReset) { try { localStorage.removeItem(STORAGE_KEY); } catch(_) {} }
 
-    // Restore remembered access
-    const remembered = localStorage.getItem('sea_demo_access') === '1';
-    if (remembered) {
-      gate.classList.add('hidden');
-      stage.classList.add('ready');
+  const splash = document.getElementById("splash");
+  const gate   = document.getElementById("gate");
+  const logo   = document.getElementById("authLogo");
+  const stageEl  = document.getElementById("stage"); // renamed to avoid confusions
+  const input  = document.getElementById("passphrase");
+  const error  = document.getElementById("error");
+  const rememberBtn = document.getElementById("rememberBtn");
+  const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const remembered = !forceBoot && (localStorage.getItem(STORAGE_KEY) === "1");
+
+  function showGate(){
+    gate.style.opacity = "1";
+    gate.style.pointerEvents = "auto";
+    setTimeout(()=> logo.style.opacity = "1", 200);
+    setTimeout(()=> input?.focus(), 400);
+  }
+
+  if (remembered) {
+    splash.classList.add("hidden");
+    gate.style.opacity = "0";            // ⚡ ensure hidden
+    gate.style.pointerEvents = "none";   // ⚡ ensure not blocking
+    stageEl.classList.add("ready");
+  } else {
+    if (prefersReduced) {
+      splash.style.animation = "none";
+      setTimeout(()=>{ splash.classList.add("hidden"); showGate(); }, 400);
     } else {
-      // Focus the input on load
-      window.addEventListener('load', () => setTimeout(() => input?.focus(), 100));
+      setTimeout(()=>{ splash.classList.add("hidden"); showGate(); }, 2000);
     }
+  }
 
-    rememberBtn.addEventListener('click', () => {
-      const pressed = rememberBtn.getAttribute('aria-pressed') === 'true';
-      rememberBtn.setAttribute('aria-pressed', (!pressed).toString());
-      rememberBtn.style.borderColor = pressed ? '#2b3542' : 'var(--brand)';
-      rememberBtn.style.color = pressed ? 'var(--fg-1)' : 'var(--brand)';
-    });
+  rememberBtn.addEventListener("click", ()=>{
+    const pressed = rememberBtn.getAttribute("aria-pressed") === "true";
+    rememberBtn.setAttribute("aria-pressed", (!pressed).toString());
+    rememberBtn.style.borderColor = pressed ? "#2b3542" : "var(--brand)";
+    rememberBtn.style.color = pressed ? "var(--fg-1)" : "var(--brand)";
+  });
 
-    form.addEventListener('submit', (e) => {
-      e.preventDefault();
-      const ok = (input.value || '').trim().toLowerCase() === PASS;
-      if (!ok) {
-        error.textContent = 'Incorrect key. Hint: "Southeast Asia"';
-        input.select();
-        return;
-      }
-      error.textContent = '';
-      gate.classList.add('hidden');
-      stage.classList.add('ready');
-      if (rememberBtn.getAttribute('aria-pressed') === 'true') {
-        localStorage.setItem('sea_demo_access', '1');
-      }
-    });
+  document.getElementById("gateForm").addEventListener("submit", (e)=>{
+    e.preventDefault();
+    const ok = (input.value || "").trim().toLowerCase() === PASS;
+    if (!ok) { error.textContent = 'Incorrect key. Hint: "Southeast Asia"'; input.select(); return; }
+    error.textContent = "";
 
-    // Allow Enter key on input to submit
-    input.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') form.requestSubmit();
-    });
-  </script>
+    // ⚡ Actively disable the overlay so p5 is interactive
+    gate.style.opacity = "0";
+    gate.style.pointerEvents = "none";
+    splash.classList.add("hidden");
+    stageEl.classList.add("ready");
 
-  <!-- Accessibility note: This gate is cosmetic and not intended for real authentication. -->
+    if (rememberBtn.getAttribute("aria-pressed") === "true") {
+      try { localStorage.setItem(STORAGE_KEY, "1"); } catch(_) {}
+    }
+  });
+
+  input.addEventListener("keydown", (e)=>{ if (e.key === "Enter") e.target.form.requestSubmit(); });
+</script>
+
+
 </body>
 </html>
