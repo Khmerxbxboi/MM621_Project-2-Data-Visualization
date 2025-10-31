@@ -63,7 +63,8 @@
       background:rgba(18,22,29,.55);
       backdrop-filter:blur(6px);
       box-shadow:var(--shadow);
-      overflow:hidden;
+      /* FIX: allow floating UI like detail modals/tooltips to escape clipping */
+      overflow: visible;
       opacity:0; transform:translateY(10px);
       transition:opacity .35s ease,transform .35s ease;
     }
@@ -147,6 +148,53 @@
       footer{font-size:13px;gap:8px;}
       .back-link{padding:8px 12px;}
     }
+
+    /* ===== FIXES: metric toolbar + detail modal (no overlap) ===== */
+
+    /* If your sketch adds a toolbar element, give it this class or ID */
+    .metric-toolbar{
+      position:fixed;
+      left:16px; bottom:16px;
+      z-index:10;
+      display:flex; gap:8px;
+      padding:10px;
+      border:1px solid #2b3542; border-radius:12px;
+      background:rgba(18,22,29,.7);
+      backdrop-filter:blur(6px);
+    }
+
+    /* Detail modal/card stays above everything and never gets clipped */
+    .score-detail{
+      position:fixed;
+      left:50%; top:50%;
+      transform:translate(-50%,-50%);
+      z-index:1000;                     /* above toolbar */
+      min-width:min(680px,92vw); max-width:92vw;
+      border-radius:16px; border:1px solid #2b3542;
+      background:rgba(18,22,29,.92);
+      box-shadow:var(--shadow);
+      padding:16px 20px 18px;
+    }
+
+    /* Close “X” built with CSS so it won’t show as a dash */
+    .modal-close{
+      position:absolute; top:10px; right:12px;
+      width:28px; height:28px;
+      border:0; background:transparent; color:#cfe3ff;
+      cursor:pointer;
+    }
+    .modal-close:hover{ color:#fff; }
+    .modal-close::before, .modal-close::after{
+      content:""; position:absolute; left:5px; top:13px;
+      width:18px; height:2px; background:currentColor; border-radius:1px;
+    }
+    .modal-close::before{ transform:rotate(45deg); }
+    .modal-close::after { transform:rotate(-45deg); }
+
+    /* Optional: while detail is open, ignore toolbar clicks */
+    .app--detail-open .metric-toolbar{
+      pointer-events:none; opacity:.6;
+    }
   </style>
 </head>
 <body>
@@ -171,7 +219,7 @@
       <div class="product">
         <span class="gem"></span><div id="gateTitle" class="name">Sign in to continue</div>
       </div>
-      <div class="tagline">Enter the SEA Directorate key to access visualization.</div>
+      <div class="tagline"> Access restricted: SEA Happiness Data · 2019 - an encrypted visualization of regional well-being through design intelligence</div>
 
       <form class="form" id="gateForm">
         <div class="field">
@@ -193,7 +241,7 @@
   </main>
 
   <footer>
-    <div>© <span id="year"></span> Bullimalinna Sot · Interaction Design & Interactive Art</div>
+    <div>© <span id="year"></span> Bullimalinna Sot · Interaction Design & Interactive  - “A 2019 snapshot of happiness — because design isn’t just pixels, it’s people.”</div>
     <div><a href="#">Built for modern web</a></div>
   </footer>
 
@@ -279,7 +327,6 @@
 
   input.addEventListener("keydown", (e)=>{ if (e.key === "Enter") e.target.form.requestSubmit(); });
 </script>
-
 
 </body>
 </html>

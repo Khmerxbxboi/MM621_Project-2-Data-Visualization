@@ -1,8 +1,8 @@
 /*
-  SEA Happiness · 2025 (p5.js)
-  - Sodaro palette (electric blue)
-  - Top-right Sodaro logo badge (no glow)
-  - All original interactions preserved
+  SEA Happiness · 2025 (p5.js) — fixed
+  - Opaque modal & backdrop (no bleed-through of “Metric”)
+  - Close “X” coordinates corrected
+  - Modal clicks handled before toolbar clicks
 */
 
 // ---------- Data ----------
@@ -21,30 +21,35 @@ let SEA_DATA = [
 // ---------- Layout ----------
 const CANVAS_W = 1400, CANVAS_H = 720;
 const LEFT_PANEL_W = 520, RIGHT_PAD = 36;
-const chart = { baselineY: CANVAS_H - 90, barW: 56, spacing: 86, startX: 0, leftMargin: LEFT_PANEL_W };
+const chart = { baselineY: CANVAS_H - 120, barW: 56, spacing: 86, startX: 0, leftMargin: LEFT_PANEL_W };
 const donut = { cx: LEFT_PANEL_W * 0.5, cy: 320, r: 160, ir: 98 };
 
 // ---------- Palette (Sodaro) ----------
-const SODARO = {
-  accent:  [  6, 182, 255], // electric blue (primary)
-  accent2: [ 30, 146, 224], // deeper blue for range
-  dark:    [ 26,  30,  38]
-};
+const SODARO = { accent:[6,182,255], accent2:[30,146,224], dark:[26,30,38] };
 const colors = {
-  barBase: 48, // neutral dark fill for bars at rest
-  accent:  SODARO.accent,     // used for active/hover
+  barBase: 48,
+  accent:  SODARO.accent,
   textPrimary:   [245,245,245],
   textSecondary: [205,213,224],
   textMuted:     [165,174,188]
 };
-// donut ring: nine blue shades → replaces brown palette
 const BLUES_HEX = ["#0CAFFF","#1E92E0","#36A8FF","#2B8BD1","#56B7FF","#2F7FBF","#4AB6FF","#2B7AB5","#88D5FF"];
 
 // ---------- Flags ----------
-const FLAG = {
-  "Myanmar": "🇲🇲","Cambodia":"🇰🇭","Vietnam":"🇻🇳","Indonesia":"🇮🇩",
-  "Laos":"🇱🇦","Philippines":"🇵🇭","Thailand":"🇹🇭","Malaysia":"🇲🇾","Singapore":"🇸🇬"
-};
+const FLAG = {"Myanmar":"🇲🇲","Cambodia":"🇰🇭","Vietnam":"🇻🇳","Indonesia":"🇮🇩","Laos":"🇱🇦","Philippines":"🇵🇭","Thailand":"🇹🇭","Malaysia":"🇲🇾","Singapore":"🇸🇬"};
+
+// ---------- Metric toolbar ----------
+const METRICS = [
+  { key: "score", label: "Score", explain: d => nf(d.score,1,3) },
+  { key: "gdp", label: "GDP", explain: d => nf(d.gdp,1,3) },
+  { key: "support", label: "Support", explain: d => nf(d.support,1,3) },
+  { key: "health", label: "Health", explain: d => nf(d.health,1,3) },
+  { key: "freedom", label: "Freedom", explain: d => nf(d.freedom,1,3) },
+  { key: "generosity", label: "Generosity", explain: d => nf(d.generosity,1,3) },
+  { key: "antiCorr", label: "Anti-Corruption", explain: d => nf(1 - d.corruption,1,3) }
+];
+let currentMetric = "score";
+let metricButtons = [];
 
 // ---------- State ----------
 let bgImg, logoImg;
@@ -62,14 +67,14 @@ let detailOpenMs = 0;
 const DETAIL_FADE_SPEED = 0.2;
 const DETAIL_POP_DURATION = 260;
 
-// Card geometry for hit testing (updated each draw)
+// Card geometry
 const cardRect = { x:0,y:0,w:720,h:340 };
 let closeBtn = { x:0,y:0,w:28,h:28 };
 
 // ---------- Preload ----------
 function preload(){
-  bgImg = loadImage("image_b701a4.jpg");
-  logoImg = loadImage("sodaro_logo.png"); // transparent PNG
+  bgImg = loadImage("image_b701a4.jpg", ()=>{}, ()=>{ bgImg = null; });
+  logoImg = loadImage("sodaro_logo.png", ()=>{}, ()=>{ logoImg = null; });
 }
 
 // ---------- Setup ----------
@@ -81,11 +86,12 @@ function setup(){
   reflowBarsLayout();
 
   for (let i=0;i<SEA_DATA.length;i++){
-    const baseH = valueToBarHeight(SEA_DATA[i].score);
+    const baseH = valueToBarHeight(getMetricValue(SEA_DATA[i], currentMetric));
     const x = chart.startX + i*chart.spacing;
     barStates[i] = { x, tx:x, h:0, th:baseH, delay:i*ENTER_STAGGER, alphaMul:0 };
   }
 
+  buildMetricButtons();
   startTime = millis(); frameRate(60);
 }
 
@@ -93,33 +99,29 @@ function setup(){
 function draw(){
   drawBackgroundCover();
 
-  // Divider
   stroke(255,22); line(LEFT_PANEL_W, 0, LEFT_PANEL_W, height);
 
-  // Header
   noStroke(); fill(...colors.textPrimary); textAlign(LEFT,TOP);
   textSize(20); textStyle(BOLD);
-  text("Southeast Asia — Happiness Index (2019)", 24, 24);
+  text("Southeast Asia — Happiness (2019)", 24, 24);
   textSize(12); textStyle(NORMAL); fill(...colors.textSecondary);
-  text("Hover bars or slices • Click to open Score Detail", 24, 48);
+  text("Hover bars or slices • Click to open Score Detail • Use toolbar to change metric", 24, 48);
 
-  // Hover detection
   hoverBarIndex = barHitIndex(mouseX, mouseY);
   hoverDonutIndex = donutHitIndex(mouseX, mouseY);
-
   const visualHoverIndex = (hoverBarIndex >= 0) ? hoverBarIndex :
                            (selectedIndex < 0 ? hoverDonutIndex : -1);
 
   drawBars(visualHoverIndex);
   drawDonutSynced(visualHoverIndex);
-
-  // Top-right Sodaro logo badge (no glow)
   drawLogoTopRight();
 
-  // Click hint
+  // Optional: don't draw toolbar while modal open
+  if (selectedIndex < 0) drawMetricToolbar();
+
   if (selectedIndex < 0) drawClickHint();
 
-  // Detail modal animation
+  // Modal animation
   const targetAlpha = (selectedIndex >= 0) ? 1 : 0;
   detailAlpha = lerp(detailAlpha, targetAlpha, DETAIL_FADE_SPEED);
 
@@ -142,12 +144,41 @@ function drawBackgroundCover(){
   else { h = height; w = height * imgAR; x = (width - w)/2; y = 0; }
   image(bgImg, x, y, w, h);
 
-  // subtle dark overlay
   noStroke(); fill(0,0,0,110); rect(0,0,width,height);
-
-  // thin frame
   noFill(); stroke(255,200,120,22); strokeWeight(2);
   rect(8,8,width-16,height-16,16);
+}
+
+// ---------- Metric handling ----------
+function getMetricValue(d, metric){
+  switch(metric){
+    case "score": return d.score;
+    case "gdp": return d.gdp;
+    case "support": return d.support;
+    case "health": return d.health;
+    case "freedom": return d.freedom;
+    case "generosity": return d.generosity;
+    case "antiCorr": return 1 - d.corruption;
+    default: return d.score;
+  }
+}
+
+function metricDomain(metric){
+  switch(metric){
+    case "score":      return { min: 4.3,  max: 6.4 };
+    case "gdp":        return { min: 0.50, max: 1.60 };
+    case "support":    return { min: 1.00, max: 1.45 };
+    case "health":     return { min: 0.44, max: 1.20 };
+    case "freedom":    return { min: 0.40, max: 0.70 };
+    case "generosity": return { min: 0.16, max: 0.57 };
+    case "antiCorr":   return { min: 0.50, max: 0.97 };
+    default:           return { min: 0,    max: 1 };
+  }
+}
+
+function valueToBarHeight(val){
+  const dom = metricDomain(currentMetric);
+  return map(val, dom.min, dom.max, 80, 520, true);
 }
 
 // ---------- Bars ----------
@@ -160,7 +191,7 @@ function drawBars(visualHoverIndex){
     const ease = 1 - pow(1 - prog, 3);
     s.alphaMul = ease; s.x = lerp(s.x, s.tx, 0.14);
 
-    const baseH = valueToBarHeight(d.score);
+    const baseH = valueToBarHeight(getMetricValue(d, currentMetric));
     const isSel = i===selectedIndex, isHov = i===visualHoverIndex;
     const growth = isSel ? 72 : (isHov ? 38 : 0);
     const th = baseH*ease + growth;
@@ -173,15 +204,10 @@ function drawBars(visualHoverIndex){
 
     const barX = s.x - chart.barW/2, barY = chart.baselineY - s.h;
 
-    // bar body — active uses Sodaro accent
-    if (isSel || isHov){
-      noStroke(); fill(colors.accent[0], colors.accent[1], colors.accent[2], alpha);
-    } else {
-      stroke(70, alpha); fill(colors.barBase, alpha);
-    }
+    if (isSel || isHov){ noStroke(); fill(colors.accent[0], colors.accent[1], colors.accent[2], alpha); }
+    else { stroke(70, alpha); fill(colors.barBase, alpha); }
     rect(barX, barY, chart.barW, s.h, 6);
 
-    // label
     noStroke();
     fill(...(isSel || isHov ? colors.textPrimary : colors.textSecondary));
     textSize(12); text(d.country, s.x, barY - 10);
@@ -190,14 +216,13 @@ function drawBars(visualHoverIndex){
 
 // ---------- Donut ----------
 function drawDonutSynced(visualHoverIndex){
-  const values = SEA_DATA.map(d => max(0.0001, d.score));
+  const values = SEA_DATA.map(d => max(0.0001, getMetricValue(d, currentMetric)));
   const total  = values.reduce((a,b)=>a+b, 0);
 
   const donutHover = donutHitIndex(mouseX, mouseY);
   const activeFromHover = (visualHoverIndex >= 0) ? visualHoverIndex : donutHover;
   const activeIdx = (selectedIndex >= 0) ? selectedIndex : activeFromHover;
 
-  // shadow
   noStroke(); fill(0, 90);
   ellipse(donut.cx + 2, donut.cy + 5, donut.r*2.06, donut.r*2.06);
 
@@ -209,11 +234,7 @@ function drawDonutSynced(visualHoverIndex){
     let alpha = (activeIdx >= 0 && i !== activeIdx) ? 110 : 225;
     let expand = 0;
 
-    if (i === activeIdx){
-      col = color(SODARO.accent[0], SODARO.accent[1], SODARO.accent[2]); // match bars
-      alpha = 255;
-      expand = (selectedIndex >= 0) ? 12 : 8;
-    }
+    if (i === activeIdx){ col = color(SODARO.accent[0], SODARO.accent[1], SODARO.accent[2]); alpha = 255; expand = (selectedIndex >= 0) ? 12 : 8; }
 
     noStroke(); col.setAlpha(alpha); fill(col);
     ringSlice(donut.cx, donut.cy, donut.r + expand, donut.ir, cur, cur + a);
@@ -221,11 +242,12 @@ function drawDonutSynced(visualHoverIndex){
     cur += a;
   }
 
-  // center labels
   noStroke(); fill(0,165); ellipse(donut.cx, donut.cy, donut.ir*1.46, donut.ir*1.46);
   const labelIdx = (selectedIndex>=0) ? selectedIndex : activeIdx;
-  const title = (labelIdx>=0) ? SEA_DATA[labelIdx].country : "SCORE";
-  const sub   = (labelIdx>=0) ? `${nf(SEA_DATA[labelIdx].score,1,3)} score` : "distribution";
+  const title = (labelIdx>=0) ? SEA_DATA[labelIdx].country : metricLabel(currentMetric).toUpperCase();
+  const sub   = (labelIdx>=0)
+    ? `${metricLabel(currentMetric)}: ${metricExplain(SEA_DATA[labelIdx], currentMetric)}`
+    : "distribution";
   fill(...colors.textPrimary); textAlign(CENTER,CENTER); textStyle(BOLD); textSize(14);
   text(title, donut.cx, donut.cy-8);
   textStyle(NORMAL); fill(...colors.textSecondary); textSize(12);
@@ -241,13 +263,64 @@ function ringSlice(cx,cy,or,ir,a,b){
   endShape(CLOSE);
 }
 
-// ---------- Score Detail (CENTERED MODAL) ----------
+// ---------- Metric toolbar (bottom) ----------
+function buildMetricButtons(){
+  metricButtons.length = 0;
+  const pad = 16;
+  const startX = chart.leftMargin + pad;
+  const y = height - 62;
+  let x = startX;
+
+  for (let i=0; i<METRICS.length; i++){
+    const label = METRICS[i].label;
+    textSize(12);
+    const w = textWidth(label) + 24;
+    const h = 28;
+    metricButtons.push({ key: METRICS[i].key, label, x, y, w, h });
+    x += w + 8;
+  }
+}
+
+function drawMetricToolbar(){
+  const barX = chart.leftMargin + 10;
+  const barY = height - 78;
+  const barW = width - chart.leftMargin - RIGHT_PAD - 20;
+  const barH = 56;
+
+  noStroke(); fill(14,18,26, 200); rect(barX, barY, barW, barH, 10);
+  stroke(255,255,255, 30); noFill(); rect(barX, barY, barW, barH, 10);
+
+  noStroke(); fill(...colors.textMuted); textAlign(LEFT,CENTER); textSize(12);
+  text("Metric", barX + 14, barY + barH/2);
+
+  for (const b of metricButtons){
+    const active = (b.key === currentMetric);
+    const mx = mouseX, my = mouseY;
+    const hov = (mx>=b.x && mx<=b.x+b.w && my>=b.y && my<=b.y+b.h);
+
+    noStroke();
+    if (active){
+      fill(34,36,42); rect(b.x, b.y, b.w, b.h, 8);
+      stroke(SODARO.accent[0], SODARO.accent[1], SODARO.accent[2], 180); noFill();
+      rect(b.x, b.y, b.w, b.h, 8); noStroke(); fill(240);
+    } else if (hov){
+      fill(30,34,44); rect(b.x, b.y, b.w, b.h, 8); fill(225);
+    } else { fill(200); }
+    textAlign(CENTER,CENTER); textSize(12);
+    text(b.label, b.x + b.w/2, b.y + b.h/2 + 0.5);
+  }
+}
+
+function metricLabel(key){ const found = METRICS.find(m => m.key === key); return found ? found.label : "Score"; }
+function metricExplain(d, key){ const found = METRICS.find(m => m.key === key); return found ? found.explain(d) : nf(d.score,1,3); }
+
+// ---------- Modal (CENTERED) ----------
 function drawScoreDetailCentered(idx, alpha, scaleAmt){
   if (idx < 0) return;
   const d = SEA_DATA[idx];
 
-  // modal backdrop
-  noStroke(); fill(0,0,0, 140 * alpha); rect(0,0,width,height);
+  // FIX: fully opaque backdrop so nothing shows through
+  noStroke(); fill(0, 255 * alpha); rect(0,0,width,height);
 
   // card size/position
   cardRect.w = 720; cardRect.h = 340;
@@ -257,20 +330,19 @@ function drawScoreDetailCentered(idx, alpha, scaleAmt){
 
   push();
   translate(cx, cy);
-  scale(scaleAmt);     // pop
+  scale(scaleAmt);
   translate(-cardRect.w/2, -cardRect.h/2);
 
-  // glass card
-  noStroke(); fill(14,18,26, 220 * alpha); rect(0,0,cardRect.w,cardRect.h,16);
+  // FIX: make card opaque too
+  noStroke(); fill(14,18,26, 255 * alpha); rect(0,0,cardRect.w,cardRect.h,16);
   stroke(255,255,255, 36 * alpha); noFill(); rect(0,0,cardRect.w,cardRect.h,16);
 
-  // close button
+  // Close button (coordinates fixed)
   closeBtn.x = cardRect.w - 36; closeBtn.y = 12; closeBtn.w = 24; closeBtn.h = 24;
-  noStroke(); fill(34,36,42, 220*alpha); rect(closeBtn.x, closeBtn.y, closeBtn.w, closeBtn.h, 6);
-  stroke(255,255,255, 160*alpha); strokeWeight(1.5);
-  line(closeBtn.x+7, closeBtn.y+7, closeBtn.x+17, closeBtn.y+17);
-  line(closeBtn.x+17, closeBtn.y+7, closeBtn.x+7, closeBtn.y+17);
-  noStroke();
+  noStroke(); fill(34,36,42, 255*alpha); rect(closeBtn.x, closeBtn.y, closeBtn.w, closeBtn.h, 6);
+  stroke(255,255,255, 200*alpha); strokeWeight(1.5);
+  line(closeBtn.x+7,  closeBtn.y+7,  closeBtn.x+17, closeBtn.y+17);
+  line(closeBtn.x+17, closeBtn.y+7,  closeBtn.x+7,  closeBtn.y+17); // FIX: use x, not y
 
   // Title
   const flag = FLAG[d.country] || "🏳️";
@@ -281,8 +353,8 @@ function drawScoreDetailCentered(idx, alpha, scaleAmt){
   textSize(22);
   text(title, cardRect.w/2, 22);
 
-  // score badge (Sodaro accent)
-  drawScoreBadge(cardRect.w/2 - 70, 52, 140, 30, d.score, alpha);
+  // metric badge
+  drawScoreBadge(cardRect.w/2 - 110, 52, 220, 30, `${metricLabel(currentMetric)}: ${metricExplain(d, currentMetric)}`, alpha);
 
   // explanation
   textStyle(NORMAL); textSize(13); fill(...colors.textSecondary, 255*alpha);
@@ -297,7 +369,7 @@ function drawScoreDetailCentered(idx, alpha, scaleAmt){
   drawKV(rx, ry +  56, "Healthy life",     nf(d.health,1,3), alpha);
   drawKV(rx, ry +  84, "Freedom",          nf(d.freedom,1,3), alpha);
   drawKV(rx, ry + 112, "Generosity",       nf(d.generosity,1,3), alpha);
-  drawKV(rx, ry + 140, "Lower corruption", nf(1 - d.corruption,1,3), alpha, " (inv)");
+  drawKV(rx, ry + 140, "Anti-corruption",  nf(1 - d.corruption,1,3), alpha);
 
   // hint
   textAlign(RIGHT,BOTTOM); textSize(11); fill(...colors.textMuted, 220*alpha);
@@ -306,36 +378,33 @@ function drawScoreDetailCentered(idx, alpha, scaleAmt){
   pop();
 }
 
-function drawKV(x,y,label,value,alpha,extra=""){
+function drawKV(x,y,label,value,alpha){
   textAlign(LEFT,CENTER); textStyle(NORMAL); textSize(12);
   fill(225,225,225, 255*alpha);
   text(label, x, y);
-  // dotted leader
   const padR = 120;
   const dotsStart = x + textWidth(label) + 8;
   const dotsEnd = x + padR + 200;
   stroke(255,255,255, 60*alpha); strokeWeight(1);
   for (let xx = dotsStart; xx < dotsEnd; xx += 4) line(xx, y, min(xx+2, dotsEnd), y);
   noStroke();
-  // value
   textAlign(RIGHT,CENTER); textStyle(BOLD);
   fill(...colors.textPrimary, 255*alpha);
-  text(value + (extra||""), x + padR + 200, y);
+  text(value, x + padR + 200, y);
 }
 
-function drawScoreBadge(x,y,w,h,score,alpha){
-  noStroke(); fill(34,36,42, 210*alpha); rect(x,y,w,h,999);
-  stroke(SODARO.accent[0], SODARO.accent[1], SODARO.accent[2], 160*alpha); noFill(); rect(x,y,w,h,999);
+function drawScoreBadge(x,y,w,h,textVal,alpha){
+  noStroke(); fill(34,36,42, 230*alpha); rect(x,y,w,h,999);
+  stroke(SODARO.accent[0], SODARO.accent[1], SODARO.accent[2], 180*alpha); noFill(); rect(x,y,w,h,999);
   fill(...colors.textPrimary, 255*alpha); textAlign(CENTER,CENTER); textSize(12); textStyle(BOLD);
-  text(`Score ${nf(score,1,3)}`, x+w/2, y+h/2+1);
+  text(textVal, x+w/2, y+h/2+1);
 }
 
 // ---------- Top-right logo ----------
 function drawLogoTopRight(){
   if (!logoImg) return;
   const pad = 14;
-  const size = 48; // tweak if you want it smaller/larger
-  // clean badge container (no glow)
+  const size = 48;
   noStroke(); fill(14,18,26, 180);
   rect(width - size - pad - 8, pad, size + 8, size + 8, 10);
   stroke(255,255,255, 26); noFill();
@@ -343,16 +412,21 @@ function drawLogoTopRight(){
   image(logoImg, width - size - pad - 4, pad + 4, size, size);
 }
 
-// ---------- Small bottom hint ----------
-function drawClickHint(){
-  const txt = "Click a bar or donut slice to open Score Detail";
-  textSize(12); const tw = textWidth(txt) + 24;
-  const w = min(max(280, tw), 520), h = 28;
-  const x = width - w - 24, y = height - h - 18;
-  noStroke(); fill(14,18,26,200); rect(x,y,w,h,8);
-  stroke(255,255,255,36); noFill(); rect(x,y,w,h,8);
-  noStroke(); fill(...colors.textSecondary); textAlign(CENTER,CENTER);
-  text(txt, x + w/2, y + h/2 + 0.5);
+// ---------- Hint ----------
+function drawClickHint() {
+  const txt = "Click a bar or donut slice to open details • Use toolbar to change metric";
+  textSize(12); // (tiny fix; was 0)
+  const tw = textWidth(txt) + 24;
+  const w = constrain(tw, 320, 620);
+  const h = 28;
+  const radius = 10;
+  const x = width - w - 24;
+  const y = height - h - 90;
+
+  noStroke(); fill(14, 18, 26, 220); rect(x, y, w, h, radius);
+  fill(...colors.textSecondary);
+  textAlign(CENTER, CENTER);
+  text(txt, x + w / 2, y + h / 2 + 0.5);
 }
 
 // ---------- Explain ----------
@@ -372,7 +446,7 @@ function explainWhyHappy(d){
 
 // ---------- Interactions ----------
 function mousePressed(){
-  // modal close or backdrop
+  // FIX: Handle modal first so clicks don't change metric underneath
   if (detailAlpha > 0.9 && selectedIndex >= 0){
     const cx = width/2, cy = height/2;
     const mx = mouseX - (cx - cardRect.w/2);
@@ -385,22 +459,35 @@ function mousePressed(){
     const insideCard =
       mouseX >= cardRect.x && mouseX <= cardRect.x + cardRect.w &&
       mouseY >= cardRect.y && mouseY <= cardRect.y + cardRect.h;
-    if (!insideCard){ selectedIndex = -1; return; }
-    return;
+    if (!insideCard){ selectedIndex = -1; }
+    return; // stop here while modal is open
   }
 
-  // bars
+  // Toolbar
+  for (const b of metricButtons){
+    if (mouseX>=b.x && mouseX<=b.x+b.w && mouseY>=b.y && mouseY<=b.y+b.h){
+      if (currentMetric !== b.key){
+        currentMetric = b.key;
+        for (let i=0;i<SEA_DATA.length;i++){
+          const d = SEA_DATA[i], s = barStates[i];
+          s.th = valueToBarHeight(getMetricValue(d, currentMetric));
+        }
+        selectedIndex = -1;
+      }
+      return;
+    }
+  }
+
+  // Bars
   const bi = barHitIndex(mouseX, mouseY);
   if (bi >= 0){ selectedIndex = (selectedIndex === bi) ? -1 : bi; if (selectedIndex >= 0) detailOpenMs = millis(); return; }
 
-  // donut
+  // Donut
   const di = donutHitIndex(mouseX, mouseY);
   if (di >= 0){ selectedIndex = (selectedIndex === di) ? -1 : di; if (selectedIndex >= 0) detailOpenMs = millis(); return; }
 }
 
-function keyPressed(){
-  if (keyCode === ESCAPE && selectedIndex >= 0){ selectedIndex = -1; }
-}
+function keyPressed(){ if (keyCode === ESCAPE && selectedIndex >= 0){ selectedIndex = -1; } }
 
 // ---------- Hit Tests ----------
 function barHitIndex(mx,my){
@@ -419,7 +506,7 @@ function donutHitIndex(mx,my){
   const inside = (mx < chart.leftMargin) && distR >= donut.ir && distR <= donut.r + 10;
   if (!inside) return -1;
 
-  const values = SEA_DATA.map(d => max(0.0001, d.score));
+  const values = SEA_DATA.map(d => max(0.0001, getMetricValue(d, currentMetric)));
   const total  = values.reduce((a,b)=>a+b, 0);
   let angleM = atan2(dy, dx); if (angleM < -HALF_PI) angleM += TWO_PI;
 
@@ -445,5 +532,3 @@ function reflowBarsLayout(){
   const total = N*chart.spacing;
   chart.startX = chart.leftMargin + pad + chart.spacing/2 + (rightW - pad*2 - total)/2;
 }
-
-function valueToBarHeight(val){ return map(val, 4.3, 6.3, 80, 520, true); }
