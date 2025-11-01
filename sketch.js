@@ -6,6 +6,8 @@
 */
 
 // ---------- Data ----------
+
+
 let SEA_DATA = [
   { country: "Myanmar",     score: 4.360, gdp: 0.710, support: 1.181, health: 0.555, freedom: 0.525, generosity: 0.566, corruption: 0.172 },
   { country: "Cambodia",    score: 4.476, gdp: 0.603, support: 1.184, health: 0.633, freedom: 0.605, generosity: 0.287, corruption: 0.046 },
@@ -78,6 +80,15 @@ function preload(){
 }
 
 // ---------- Setup ----------
+function setup(){
+  const c = createCanvas(windowWidth * 0.96, min(windowHeight * 0.7, 820));
+  c.parent('stage');           // <-- this centers it (CSS targets #stage canvas)
+}
+function windowResized(){
+  resizeCanvas(windowWidth * 0.96, min(windowHeight * 0.7, 820));
+}
+
+
 function setup(){
   const c = createCanvas(CANVAS_W, CANVAS_H);
   if (document.getElementById("app")) c.parent("app");

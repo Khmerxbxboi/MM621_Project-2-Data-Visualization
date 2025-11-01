@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Inspiration · SEA Happiness Visualization 2025</title>
+  <meta name="theme-color" content="#0CAFFF" />
+
+  <style>
+    :root{
+      --bg:#0a0e14; --bg2:#0f1420; --ink:#e9eef7; --muted:#a6b4c9;
+      --brand:#0CAFFF; --brand2:#7ad8ff;
+      --line:#1a2738; --shadow:0 14px 40px rgba(0,0,0,.45); --radius:16px;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;min-height:100%;background:radial-gradient(1200px 600px at 15% -10%, #0e1a2a 0%, transparent 60%), #0a0e14;color:var(--ink);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
+    a{color:inherit;text-decoration:none}
+
+    /* Header */
+    header{
+      position:sticky; top:0; z-index:5;
+      display:flex; justify-content:space-between; align-items:center;
+      padding:14px clamp(12px,4vw,24px);
+      background:linear-gradient(180deg, rgba(8,12,18,.92), rgba(8,12,18,.78));
+      border-bottom:1px solid #171f2a; backdrop-filter:blur(10px);
+    }
+    header .title{font-weight:800; letter-spacing:.2px}
+    header .back{color:var(--muted); border:1px solid var(--line); padding:8px 12px; border-radius:12px}
+    header .back:hover{color:var(--ink); border-color:#2b3a50}
+
+    /* Main */
+    main{max-width:980px; margin:22px auto 0; padding:0 clamp(12px,4vw,24px)}
+    h1{font-size:clamp(18px,4.5vw,26px); margin:0 0 4px}
+    .sub{color:var(--muted); font-size:14px; margin:0 0 18px}
+
+    /* Link grid (mobile-first) */
+    .grid{
+      display:grid; gap:12px; grid-template-columns:1fr;
+    }
+    .card{
+      background:linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.03));
+      border:1px solid var(--line); border-radius:14px; box-shadow:var(--shadow);
+      padding:14px; display:flex; align-items:center; justify-content:space-between; gap:10px;
+    }
+    .card .meta{display:flex; flex-direction:column; gap:3px}
+    .card .name{font-weight:700}
+    .card .desc{color:var(--muted); font-size:13px}
+    .pill{
+      display:inline-flex; align-items:center; gap:6px;
+      background:rgba(12,175,255,.12); color:var(--brand2);
+      border:1px solid #1e2e40; padding:8px 10px; border-radius:999px; font-weight:700; font-size:13px;
+      transition:.18s ease;
+    }
+    .pill::after{content:"↗"}
+    .card:active .pill, .card:hover .pill{background:rgba(12,175,255,.2); border-color:var(--brand)}
+
+    .infoblock{
+      margin:18px 0 10px; padding:14px;
+      background:linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
+      border:1px solid var(--line); border-radius:14px;
+    }
+    .infoblock h2{margin:0 0 8px; font-size:15px; color:var(--brand)}
+    .bars{display:grid; gap:10px}
+    .bar{background:#0c121b; border:1px solid #142233; border-radius:999px; overflow:hidden; height:12px; position:relative}
+    .bar span{
+      position:absolute; inset:0 0 0 auto; width:var(--w);
+      background:linear-gradient(90deg, rgba(12,175,255,.1), rgba(12,175,255,.9));
+      box-shadow:inset 0 0 12px rgba(12,175,255,.5);
+    }
+    .labels{display:flex; justify-content:space-between; color:var(--muted); font-size:12px; margin-top:6px}
+    .legend{display:flex; gap:8px; flex-wrap:wrap; margin-top:10px}
+    .legend .tag{
+      border:1px solid #1e2e40; color:var(--muted);
+      padding:6px 8px; border-radius:999px; font-size:12px;
+    }
+
+    /* Footer */
+    footer{
+      margin:20px clamp(12px,4vw,24px); padding:12px;
+      background:linear-gradient(180deg, #0e141d, #0d131c);
+      border:1px solid #151e2a; border-radius:var(--radius);
+      box-shadow:var(--shadow);
+      display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;
+      color:var(--muted); font-size:14px;
+    }
+    footer .links{display:flex; gap:10px; flex-wrap:wrap}
+    .hi{color:#00121f; background:var(--brand); padding:6px 10px; border-radius:8px; font-weight:800}
+    .hi:hover{background:#33c3ff}
+
+    /* Responsive tweaks */
+    @media (min-width:640px){
+      .grid{grid-template-columns:1fr 1fr}
+    }
+    @media (min-width:960px){
+      .grid{grid-template-columns:1fr 1fr 1fr}
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="title">Inspiration</div>
+    <a class="back" href="index.html">← Back to Visualization</a>
+  </header>
+
+  <main>
+    <h1>Design & Data-Viz Inspiration</h1>
+    <p class="sub">Curated references that blend storytelling, interaction, and clean data design.</p>
+
+    <section class="grid" aria-label="Inspiration links">
+      <a class="card" href="https://observablehq.com/" target="_blank" rel="noopener">
+        <div class="meta">
+          <span class="name">Observable HQ</span>
+          <span class="desc">Notebook-driven data exploration & components</span>
+        </div>
+        <span class="pill">Open</span>
+      </a>
+
+      <a class="card" href="https://ourworldindata.org/happiness" target="_blank" rel="noopener">
+        <div class="meta">
+          <span class="name">Our World in Data</span>
+          <span class="desc">Happiness research and global indicators</span>
+        </div>
+        <span class="pill">Open</span>
+      </a>
+
+      <a class="card" href="https://datavizproject.com/" target="_blank" rel="noopener">
+        <div class="meta">
+          <span class="name">Data Viz Project</span>
+          <span class="desc">Catalog of chart types & use cases</span>
+        </div>
+        <span class="pill">Open</span>
+      </a>
+
+      <a class="card" href="https://pudding.cool/" target="_blank" rel="noopener">
+        <div class="meta">
+          <span class="name">The Pudding</span>
+          <span class="desc">Data-driven stories with attitude</span>
+        </div>
+        <span class="pill">Open</span>
+      </a>
+
+      <a class="card" href="https://informationisbeautiful.net/" target="_blank" rel="noopener">
+        <div class="meta">
+          <span class="name">Information Is Beautiful</span>
+          <span class="desc">Iconic visual explanations & ideas</span>
+        </div>
+        <span class="pill">Open</span>
+      </a>
+    </section>
+
+
+    <section class="infoblock" aria-label="Infographic preview">
+      <h2>Infographic Preview · SEA 2019 (Sample)</h2>
+      <div class="bars">
+   
+
+
+        <div class="bar" style="--w:72%"></div>
+        <div class="bar" style="--w:58%"></div>
+        <div class="bar" style="--w:44%"></div>
+        <div class="bar" style="--w:32%"></div>
+      </div>
+      <div class="labels"><span>Higher well-being</span><span>Lower</span></div>
+      <div class="legend">
+        <span class="tag">GDP</span>
+        <span class="tag">Support</span>
+        <span class="tag">Health</span>
+        <span class="tag">Freedom</span>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div>© 2025 Bulli Sot</div>
+    <div class="links">
+      <a class="hi" href="https://worldhappiness.report/ed/2019/" target="_blank" rel="noopener">🌏 2019 Data Source</a>
+      <a href="https://github.com/khmerxbxboi/MM621_Project-2-Data-Visualization" target="_blank" rel="noopener">GitHub Repo</a>
+      <a href="https://www.jayaproduction.com" target="_blank" rel="noopener">jayaproduction.com</a>
+    </div>
+  </footer>
+
+</body>
+</html>
