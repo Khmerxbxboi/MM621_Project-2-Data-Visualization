@@ -3,14 +3,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>SEA Happiness Data · Sodaro Visualization </title>
+  <title>SEA Happiness Data · Sodaro Visualization</title>
 
   <!-- p5.js -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js" defer></script>
-  <script src="sketch_001.js" defer></script>
+  <script src="sketch.js" defer></script>
 
   <meta name="theme-color" content="#0CAFFF" />
-  <meta property="og:title" content="Sodaro · SEA Happiness Visualization " />
+  <meta property="og:title" content="Sodaro · SEA Happiness Visualization" />
   <meta property="og:description" content="Electric-blue interactive data visualization built in p5.js by Bullimalinna Sot." />
   <meta property="og:type" content="website" />
 
@@ -20,7 +20,7 @@
       --brand:#0CAFFF; --muted:#1f2630; --radius:14px; --shadow:0 10px 30px rgba(0,0,0,.35);
       --safe-bottom: env(safe-area-inset-bottom, 0px);
       --safe-top: env(safe-area-inset-top, 0px);
-      --vh: 100vh; /* will be replaced by visualViewport height */
+      --vh: 100vh; /* replaced by visualViewport height */
     }
 
     *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -119,13 +119,32 @@
     .btn:hover{border-color:var(--brand); color:var(--brand)}
     .error{color:#ff7a7a; font-size:13px; min-height:18px}
 
-    /* --- Mobile-only footer toggle & chrome dim --- */
+    /* --- Mobile-only footer toggle & chrome dim + tighter header --- */
     @media(max-width:720px){
       .subtitle{display:none}
-      .stage{padding:10px}
+
+      /* tighter vertical rhythm */
+      body{ gap:8px; }
+
+      /* slimmer header */
+      header{
+        padding: calc(6px + var(--safe-top)) 10px 6px;
+      }
+      .title{ font-size: clamp(14px, 4.2vw, 18px); }
+
+      /* compact back link */
+      .back-link{
+        padding: 6px 10px;
+        font-size: 12px;
+        border-radius: 8px;
+      }
+
+      /* pull the stage closer for a taller canvas view */
+      .stage{ padding:10px; margin: 0 10px; }
+
       footer{font-size:13px; gap:8px}
 
-      /* Footer behaves like a slide-up sheet on mobile */
+      /* footer behaves like a slide-up sheet on mobile */
       footer{
         position: fixed;
         left: 12px; right: 12px;
@@ -141,7 +160,7 @@
         pointer-events: auto;
       }
 
-      /* Floating toggle button */
+      /* floating toggle button */
       .footer-toggle{
         position: fixed;
         right: 14px;
@@ -162,13 +181,14 @@
         border-color: var(--brand);
       }
 
-      /* Dim non-canvas chrome when footer hidden */
-      body.chrome-dim header{
-        opacity:.6;
-      }
-      body.chrome-dim .stage{
-        box-shadow: 0 16px 50px rgba(0,0,0,.55);
-      }
+      /* dim chrome when footer hidden */
+      body.chrome-dim header{ opacity:.6; }
+      body.chrome-dim .stage{ box-shadow: 0 16px 50px rgba(0,0,0,.55); }
+    }
+
+    /* hide back link on very small phones for extra space */
+    @media(max-width:480px){
+      .back-link{display:none}
     }
   </style>
 </head>
@@ -408,11 +428,9 @@
       if (!withinFooter && !isToggle) closeFooter();
     }, { passive:true });
 
-    // Keep footer open above the keyboard; otherwise default is fine
+    // Keep footer open above the keyboard; optional adjustments could go here
     if (window.visualViewport){
-      visualViewport.addEventListener('resize', ()=>{
-        // optional: could adjust position if needed
-      });
+      visualViewport.addEventListener('resize', ()=>{ /* no-op */ });
     }
   })();
 </script>
