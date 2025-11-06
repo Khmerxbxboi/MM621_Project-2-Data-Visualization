@@ -1,8 +1,4 @@
-/*
-  SEA Happiness · 2025 (p5.js) — Desktop classic + Mobile stacked (donut > pill > vertical bars)
-  - Desktop: donut left, vertical bars right, bottom toolbar chips
-  - Mobile: donut centered, metric pill, vertical bars BELOW donut (grow bottom→top)
-*/
+
 
 // ---------- Data ----------
 let SEA_DATA = [
