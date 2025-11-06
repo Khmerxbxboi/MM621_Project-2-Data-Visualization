@@ -41,6 +41,7 @@
       position:relative; z-index:1;
       display:flex; align-items:center; justify-content:space-between;
       padding:calc(12px + var(--safe-top)) clamp(12px,4vw,28px) 12px;
+      transition: opacity .25s ease;
     }
     .brand{display:flex; flex-direction:column; text-decoration:none; color:var(--fg-1);}
     .title{font-weight:800; font-size:clamp(18px,2.3vw,22px);}
@@ -58,7 +59,7 @@
       box-shadow:var(--shadow);
       overflow:hidden;
       opacity:0; transform:translateY(10px);
-      transition:opacity .35s ease,transform .35s ease;
+      transition:opacity .35s ease,transform .35s ease, box-shadow .25s ease;
       padding-bottom: calc(clamp(8px,2vw,16px) + var(--safe-bottom));
       min-height: 60vh;
     }
@@ -71,6 +72,7 @@
       padding:14px clamp(14px,3vw,22px);
       display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap;
       font-size:14px; color:var(--fg-2);
+      transition: transform .28s ease, opacity .2s ease;
     }
     footer a{color:var(--fg-1); text-decoration:none}
     footer a:hover{color:var(--brand)}
@@ -117,11 +119,56 @@
     .btn:hover{border-color:var(--brand); color:var(--brand)}
     .error{color:#ff7a7a; font-size:13px; min-height:18px}
 
+    /* --- Mobile-only footer toggle & chrome dim --- */
     @media(max-width:720px){
       .subtitle{display:none}
       .stage{padding:10px}
       footer{font-size:13px; gap:8px}
-      .back-link{padding:8px 12px}
+
+      /* Footer behaves like a slide-up sheet on mobile */
+      footer{
+        position: fixed;
+        left: 12px; right: 12px;
+        bottom: 12px;
+        z-index: 940;
+        transform: translateY(110%);
+        opacity: 0;
+        pointer-events: none;
+      }
+      footer.show{
+        transform: translateY(0);
+        opacity: 1;
+        pointer-events: auto;
+      }
+
+      /* Floating toggle button */
+      .footer-toggle{
+        position: fixed;
+        right: 14px;
+        bottom: calc(14px + var(--safe-bottom));
+        z-index: 950;
+        padding: 10px 12px;
+        font-weight: 800;
+        font-size: 13px;
+        border-radius: 12px;
+        border: 1px solid #2b3542;
+        background: rgba(255,255,255,.04);
+        color: var(--fg-1);
+        box-shadow: var(--shadow);
+        backdrop-filter: blur(6px);
+      }
+      .footer-toggle[aria-expanded="true"]{
+        color: var(--brand);
+        border-color: var(--brand);
+      }
+
+      /* Dim non-canvas chrome when footer hidden */
+      body.chrome-dim header{
+        opacity:.6;
+      }
+      body.chrome-dim .stage{
+        box-shadow: 0 16px 50px rgba(0,0,0,.55);
+      }
     }
   </style>
 </head>
@@ -166,7 +213,7 @@
     <div id="app"></div>
   </main>
 
-  <footer>
+  <footer id="pageFooter" aria-hidden="true">
     <div>© <span id="year"></span> Bullimalinna Sot · Interaction Design & Interactive Art MM621 — “Designing happiness, not just pixels.”</div>
     <div class="footer-links">
       <a href="https://worldhappiness.report/ed/2019/" target="_blank">🌏 2019 Data Source</a> ·
@@ -174,6 +221,11 @@
       <a href="inspiration.html">💡 Inspiration</a>
     </div>
   </footer>
+
+  <!-- Mobile-only footer toggle button -->
+  <button class="footer-toggle" id="footerToggle" aria-expanded="false" aria-controls="pageFooter" hidden>
+    ☰ Info
+  </button>
 
 <script>
   // ---------- true 100vh on mobile (keyboard safe) ----------
@@ -310,6 +362,58 @@
       setMic(true);
       try { rec.start(); } catch(_) { setMic(false); }
     });
+  })();
+
+  // ---------- Mobile-only footer toggle & chrome dim ----------
+  (function setupFooterToggle(){
+    const isMobile = window.matchMedia('(max-width: 720px)').matches;
+    const footer = document.getElementById('pageFooter');
+    const toggle = document.getElementById('footerToggle');
+
+    if (!isMobile || !footer || !toggle) return;
+
+    // Show the toggle button on mobile
+    toggle.hidden = false;
+
+    // Start with footer hidden and chrome dimmed
+    document.body.classList.add('chrome-dim');
+    footer.classList.remove('show');
+    footer.setAttribute('aria-hidden','true');
+    toggle.setAttribute('aria-expanded','false');
+
+    function openFooter(){
+      footer.classList.add('show');
+      footer.setAttribute('aria-hidden','false');
+      toggle.setAttribute('aria-expanded','true');
+      document.body.classList.remove('chrome-dim');
+    }
+    function closeFooter(){
+      footer.classList.remove('show');
+      footer.setAttribute('aria-hidden','true');
+      toggle.setAttribute('aria-expanded','false');
+      document.body.classList.add('chrome-dim');
+    }
+
+    toggle.addEventListener('click', ()=>{
+      const expanded = toggle.getAttribute('aria-expanded') === 'true';
+      expanded ? closeFooter() : openFooter();
+    });
+
+    // Close footer if user taps outside of it (but not the toggle)
+    document.addEventListener('click', (e)=>{
+      const expanded = toggle.getAttribute('aria-expanded') === 'true';
+      if (!expanded) return;
+      const withinFooter = footer.contains(e.target);
+      const isToggle = toggle.contains(e.target);
+      if (!withinFooter && !isToggle) closeFooter();
+    }, { passive:true });
+
+    // Keep footer open above the keyboard; otherwise default is fine
+    if (window.visualViewport){
+      visualViewport.addEventListener('resize', ()=>{
+        // optional: could adjust position if needed
+      });
+    }
   })();
 </script>
 </body>
