@@ -2,10 +2,11 @@
   Regional Perspectives on Wellbeing: Southeast Asia — 2025 (p5.js)
   - CSV-driven (2019.csv) with graceful fallback (SEA subset).
   - Mobile: donut centered, BIG ◀ ▶ pill; full-width horizontal bars below.
-  - Desktop: donut left, vertical bars right; wrapped toolbar; Info pill hugs the logo.
+  - Desktop: donut left, vertical bars right; wrapped toolbar; Info pill near logo.
   - Info overlay explains each metric (what/why) + how to read donut & bars.
   - Anti-Corruption label simplified (no %), value uses CSV "Perceptions of corruption" directly.
-  - Country modal: polished pop-in + animated "wave" header (no freeze).
+  - Country modal: polished pop-in, CLEAN header strip (no wave).
+  - Background: optionally uses population_inspo.(png|jpg) if present.
 */
 
 // ---------- CSV ingest ----------
@@ -51,11 +52,10 @@ const METRICS = [
   { key: "health",     label: "Healthy Life",   explain: d => nf(d.health,1,3) },
   { key: "freedom",    label: "Freedom",        explain: d => nf(d.freedom,1,3) },
   { key: "generosity", label: "Generosity",     explain: d => nf(d.generosity,1,3) },
-  // UI shows "Anti-Corruption" but value comes from CSV "Perceptions of corruption"
-  { key: "antiCorr",   label: "Anti-Corruption", explain: d => nf(d.corruption,1,3) }
+  { key: "antiCorr",   label: "Anti-Corruption", explain: d => nf(d.corruption,1,3) } // from perceptions of corruption
 ];
 
-// Info copy (plain, exec-ready)
+// Metric explainer copy
 const METRIC_COPY = {
   score:     { what:"Overall happiness score (2019 WHR, SEA subset).", why:"Roll-up of well-being across economic, social, and governance signals." },
   gdp:       { what:"Material comfort and access to services.",        why:"Higher GDP → better jobs, infrastructure, safety nets—less daily money stress." },
@@ -71,7 +71,7 @@ let metricButtons = [];
 let metricLabelGutter = 0;
 
 // ---------- Layout/State ----------
-let bgImg, logoImg;
+let bgImg = null, logoImg = null, inspoImg = null;
 let isMobile = false;
 
 // desktop bars layout
@@ -108,15 +108,21 @@ let pillNext  = { x:0, y:0, r:0 };
 
 // ---------- Info overlay (ⓘ) ----------
 let infoOpen = false;
-// Defaults; re-position near logo on desktop
-let infoBtn = { x: 0, y: 0, w: 64, h: 26 };
-
-// Track logo rect so we can anchor the Info button beside it
+let infoBtn = { x: 0, y: 0, w: 64, h: 26 }; // repositioned in reflow
 let logoRect = null;
 
 // ---------- Preload ----------
 function preload(){
   tableCSV = loadTable("2019.csv", "csv", "header");
+
+  // Try inspiration image first (your attachment-style). If not found, fall back.
+  inspoImg = loadImage("population_inspo.png",
+    ()=>{}, ()=>{ inspoImg = null; });
+  if (!inspoImg){
+    inspoImg = loadImage("population_inspo.jpg",
+      ()=>{}, ()=>{ inspoImg = null; });
+  }
+
   bgImg = loadImage("image_b701a4.jpg", ()=>{}, ()=>{ bgImg = null; });
   logoImg = loadImage("sodaro_logo.png", ()=>{}, ()=>{ logoImg = null; });
 }
@@ -162,7 +168,7 @@ function buildSEADataFromCSV(tbl){
         health:       fnum(tbl.getString(r, H.health)),
         freedom:      fnum(tbl.getString(r, H.freedom)),
         generosity:   fnum(tbl.getString(r, H.generosity)),
-        corruption:   fnum(tbl.getString(r, H.corruption)) // direct column
+        corruption:   fnum(tbl.getString(r, H.corruption))
       };
       for (const k of ["score","gdp","support","health","freedom","generosity","corruption"]){
         if (isNaN(row[k])) row[k] = 0;
@@ -193,7 +199,6 @@ function reflow(){
   isMobile = (width < 700);
 
   if (isMobile){
-    // Mobile layout
     const padX = 12, topY = 72;
     donut.r  = min(150, width * 0.34, height * 0.28);
     donut.ir = donut.r * 0.62;
@@ -212,11 +217,9 @@ function reflow(){
 
     chart.leftMargin = 0;
 
-    // On mobile (no logo block), keep Info at top-right
     infoBtn.x = width - 16 - infoBtn.w;
     infoBtn.y = 16;
   } else {
-    // Desktop layout
     chart.leftMargin = min(540, max(400, width * 0.38));
     const rightW = width - chart.leftMargin - 36;
     const N = SEA_DATA.length, pad = 44;
@@ -234,11 +237,9 @@ function reflow(){
 
     layoutMetricPill();
 
-    // Pre-calc logo rect to anchor Info beside it
     const padLogo = 14, size = 48, block = size + 8;
     logoRect = { x: width - block - padLogo, y: padLogo, w: block, h: block };
 
-    // Place Info pill to the LEFT of the logo block, centered vertically
     const gap = 10;
     infoBtn.x = logoRect.x - gap - infoBtn.w;
     infoBtn.y = logoRect.y + (logoRect.h - infoBtn.h)/2;
@@ -266,7 +267,7 @@ function draw(){
   textStyle(NORMAL); fill(...colors.textSecondary); textSize(isMobile ? 12 : 13);
   text(`Metric: ${metricLabel(currentMetric)} — ${METRIC_COPY[currentMetric].what}`, 16, isMobile ? 40 : 42);
 
-  // Info pill (anchored near the logo on desktop)
+  // Info pill
   drawInfoButton();
 
   // Hovers
@@ -304,15 +305,16 @@ function draw(){
 
 // ---------- Background ----------
 function drawBackgroundCover(){
-  if (!bgImg) { background(12); return; }
-  const imgAR = bgImg.width / bgImg.height;
+  const src = inspoImg || bgImg;
+  if (!src) { background(12); return; }
+  const imgAR = src.width / src.height;
   const canAR = width / height;
   let w,h,x,y;
   if (canAR > imgAR){ w = width; h = width / imgAR; x = 0; y = (height - h)/2; }
   else { h = height; w = height * imgAR; x = (width - w)/2; y = 0; }
-  image(bgImg, x, y, w, h);
+  image(src, x, y, w, h);
 
-  noStroke(); fill(0,0,0,110); rect(0,0,width,height);
+  noStroke(); fill(0,0,0,120); rect(0,0,width,height);     // darker glass
   noFill(); stroke(255,200,120,22); strokeWeight(2);
   rect(8,8,width-16,height-16,16);
 }
@@ -326,7 +328,7 @@ function getMetricValue(d, metric){
     case "health": return d.health;
     case "freedom": return d.freedom;
     case "generosity": return d.generosity;
-    case "antiCorr": return d.corruption; // UI shows "Anti-Corruption"
+    case "antiCorr": return d.corruption; // UI shows Anti-Corruption
     default: return d.score;
   }
 }
@@ -561,7 +563,7 @@ function drawMetricToolbar(){
   }
 }
 
-// ---------- Mobile metric pill (BIG ◀ ▶, crisp) ----------
+// ---------- Mobile metric pill ----------
 function layoutMetricPill(){
   if (!isMobile){
     pillBounds = {x:0,y:0,w:0,h:0};
@@ -581,41 +583,33 @@ function layoutMetricPill(){
 function drawMetricPill(){
   layoutMetricPill();
 
-  // pill
   noStroke(); fill(34,36,42, 235);
   rect(pillBounds.x, pillBounds.y, pillBounds.w, pillBounds.h, 999);
   stroke(SODARO.accent[0], SODARO.accent[1], SODARO.accent[2], 170); noFill();
   rect(pillBounds.x, pillBounds.y, pillBounds.w, pillBounds.h, 999);
 
-  // label
   noStroke(); fill(245);
   textAlign(CENTER,CENTER); textSize(12.5); textStyle(BOLD);
   text(`${metricLabel(currentMetric)}`, pillBounds.x + pillBounds.w/2, pillBounds.y + pillBounds.h/2 + 0.5);
 
-  // arrow buttons
   noStroke(); fill(34,36,42, 235);
   circle(pillPrev.x, pillPrev.y, pillPrev.r*2);
   circle(pillNext.x, pillNext.y, pillNext.r*2);
 
-  // chevrons (crisp)
   stroke(255,255,255, 225); strokeWeight(2);
-  // left '<'
   line(pillPrev.x + 6, pillPrev.y - 6, pillPrev.x - 6, pillPrev.y);
   line(pillPrev.x + 6, pillPrev.y + 6, pillPrev.x - 6, pillPrev.y);
-  // right '>'
   line(pillNext.x - 6, pillNext.y - 6, pillNext.x + 6, pillNext.y);
   line(pillNext.x - 6, pillNext.y + 6, pillNext.x + 6, pillNext.y);
 }
 
-// ---------- Country Modal (with animated wave header) ----------
+// ---------- Country Modal (CLEAN header, no wave) ----------
 function drawScoreDetailCentered(idx, alpha, scaleAmt){
   if (idx < 0) return;
   const d = SEA_DATA[idx];
 
-  // Opaque backdrop
   noStroke(); fill(0, 255 * alpha); rect(0,0,width,height);
 
-  // Responsive card size
   cardRect.w = isMobile ? min(380, width - 32) : min(740, width - 64);
   cardRect.h = isMobile ? 368 : 352;
 
@@ -625,15 +619,15 @@ function drawScoreDetailCentered(idx, alpha, scaleAmt){
 
   push();
   translate(cx, cy);
-  scale(scaleAmt);                 // pop-in scale animation
+  scale(scaleAmt);
   translate(-cardRect.w/2, -cardRect.h/2);
 
   // Card base
   noStroke(); fill(14,18,26, 255 * alpha); rect(0,0,cardRect.w,cardRect.h,16);
 
-  // Animated wave header strip (Interaction design flair)
-  const headerH = 74;
-  drawWaveHeader(0, 0, cardRect.w, headerH, alpha);
+  // Header strip (subtle gradient + accent hairline)
+  const headerH = 68;
+  drawHeaderStrip(0, 0, cardRect.w, headerH, alpha);
 
   // Card outline
   stroke(255,255,255, 36 * alpha); noFill(); rect(0,0,cardRect.w,cardRect.h,16);
@@ -654,7 +648,8 @@ function drawScoreDetailCentered(idx, alpha, scaleAmt){
   // metric badge
   const badgeW = isMobile ? cardRect.w - 48 : 280;
   const badgeX = (cardRect.w - badgeW)/2;
-  drawScoreBadge(badgeX, isMobile ? 44 : 48, badgeW, 30, `${metricLabel(currentMetric)}: ${metricExplain(d, currentMetric)}`, alpha);
+  drawScoreBadge(badgeX, isMobile ? 44 : 48, badgeW, 30,
+    `${metricLabel(currentMetric)}: ${metricExplain(d, currentMetric)}`, alpha);
 
   // content
   textStyle(NORMAL); fill(...colors.textSecondary, 255*alpha);
@@ -685,7 +680,6 @@ function drawScoreDetailCentered(idx, alpha, scaleAmt){
     drawKV(rx, ry + 140, "Anti-Corruption",   nf(d.corruption,1,3), alpha);
   }
 
-  // Close hint
   textAlign(RIGHT,BOTTOM); textSize(11); fill(...colors.textMuted, 220*alpha);
   text(isMobile ? "Tap outside, press ESC, or × to close" : "Click background, press ESC, or × to close",
        cardRect.w - 16, cardRect.h - 12);
@@ -693,38 +687,20 @@ function drawScoreDetailCentered(idx, alpha, scaleAmt){
   pop();
 }
 
-// Subtle animated wave header (uses millis)
-function drawWaveHeader(x, y, w, h, alpha){
-  // gradient base
-  const gTop = color(20,24,32);
-  const gBot = color(12,16,22);
+// Simple gradient header strip (clean)
+function drawHeaderStrip(x, y, w, h, alpha){
+  const top = color(22,26,34, 230*alpha);
+  const bot = color(12,16,22, 180*alpha);
   for (let i = 0; i < h; i++){
     const t = i / max(1, h-1);
-    const c = lerpColor(gTop, gBot, t);
-    c.setAlpha(180*alpha);
-    stroke(c); line(x, y + i, x + w, y + i);
+    const c = lerpColor(top, bot, t);
+    stroke(c);
+    line(x, y + i, x + w, y + i);
   }
   noStroke();
-
-  // animated crest
-  const t = millis() * 0.002;
-  const amp = 6;            // amplitude
-  const per = 2.5;          // periods across width
-  fill(6,182,255, 70*alpha);
-  beginShape();
-  vertex(x, y + h);
-  for (let i = 0; i <= 64; i++){
-    const u = i / 64;
-    const xx = x + u * w;
-    const wave = sin((u * TWO_PI * per) + t) * amp;
-    const yy = y + h - 24 + wave;
-    vertex(xx, yy);
-  }
-  vertex(x + w, y + h);
-  endShape(CLOSE);
-
-  // hairline accent
-  stroke(6,182,255, 160*alpha); line(x+12, y + h - 24, x + w - 12, y + h - 24);
+  // accent hairline near bottom
+  stroke(6,182,255, 140*alpha);
+  line(x + 12, y + h - 22, x + w - 12, y + h - 22);
   noStroke();
 }
 
@@ -754,14 +730,11 @@ function drawScoreBadge(x,y,w,h,textVal,alpha){
 function drawLogoTopRight(){
   if (!logoImg || isMobile) return;
   const pad = 14, size = 48, block = size + 8;
-  // background tile behind logo
   noStroke(); fill(14,18,26, 180);
   rect(width - block - pad, pad, block, block, 10);
   stroke(255,255,255, 26); noFill();
   rect(width - block - pad, pad, block, block, 10);
   image(logoImg, width - size - pad - 4, pad + 4, size, size);
-
-  // refresh logoRect in case of dynamic resizes
   logoRect = { x: width - block - pad, y: pad, w: block, h: block };
 }
 
@@ -797,7 +770,6 @@ function explainWhyHappy(d){
 
 // ---------- Interactions ----------
 function mousePressed(){
-  // If info overlay is open, allow outside click to close
   if (infoOpen){
     const m = {x: mouseX, y: mouseY};
     const r = infoCardRect();
@@ -805,13 +777,11 @@ function mousePressed(){
     return;
   }
 
-  // Country modal first
   if (detailAlpha > 0.9 && selectedIndex >= 0){
     const insideCard =
       mouseX >= cardRect.x && mouseX <= cardRect.x + cardRect.w &&
       mouseY >= cardRect.y && mouseY <= cardRect.y + cardRect.h;
 
-    // Close button
     const mx = mouseX - cardRect.x, my = mouseY - cardRect.y;
     if (mx > closeBtn.x && mx < closeBtn.x + closeBtn.w &&
         my > closeBtn.y && my < closeBtn.y + closeBtn.h){
@@ -914,7 +884,6 @@ function donutHitIndex(mx,my){
 
 // ---------- Info button & overlay ----------
 function drawInfoButton(){
-  // pill with "ⓘ Info"
   noStroke(); fill(34,36,42, 230);
   rect(infoBtn.x, infoBtn.y, infoBtn.w, infoBtn.h, 999);
   stroke(SODARO.accent[0], SODARO.accent[1], SODARO.accent[2], 170); noFill();
@@ -933,29 +902,23 @@ function infoCardRect(){
 
 function drawInfoOverlay(){
   const r = infoCardRect();
-  // backdrop
   noStroke(); fill(0, 220); rect(0,0,width,height);
 
-  // card
   noStroke(); fill(14,18,26, 255); rect(r.x, r.y, r.w, r.h, 16);
   stroke(255,255,255, 36); noFill(); rect(r.x, r.y, r.w, r.h, 16);
 
   const pad = 20;
   let y = r.y + pad + 2;
 
-  // Title with active metric
   noStroke(); fill(...colors.textPrimary); textAlign(LEFT,TOP); textStyle(BOLD);
   textSize(isMobile ? 16 : 18);
   text(`About “${metricLabel(currentMetric)}”`, r.x + pad, y);
   y += 26;
 
   textStyle(NORMAL); fill(...colors.textSecondary); textSize(isMobile ? 12 : 13);
-
-  // What & Why (metric-specific)
   drawInfoLine(r.x+pad, y, `What it means: ${METRIC_COPY[currentMetric].what}`); y += 22;
   drawInfoLine(r.x+pad, y, `Why it matters: ${METRIC_COPY[currentMetric].why}`); y += 24;
 
-  // Donut & bars explainer
   textStyle(BOLD); fill(...colors.textPrimary);
   text("How to read the visuals", r.x+pad, y); y += 20;
   textStyle(NORMAL); fill(...colors.textSecondary);
@@ -963,13 +926,11 @@ function drawInfoOverlay(){
   drawInfoLine(r.x+pad, y, "• Bars = country values for the active metric (vertical on desktop, horizontal on mobile)."); y += 20;
   drawInfoLine(r.x+pad, y, "• Interact = hover/tap to highlight; click/tap for details. Change metric with toolbar or ◀ ▶ pill."); y += 24;
 
-  // One-liner for panels
   textStyle(BOLD); fill(...colors.textPrimary);
   text("Use case (executive pitch)", r.x+pad, y); y += 20;
   textStyle(NORMAL); fill(...colors.textSecondary);
   drawInfoLine(r.x+pad, y, "“This dashboard benchmarks wellbeing drivers across Southeast Asia to guide policy, budget focus, and program ROI.”"); y += 20;
 
-  // Close hint
   textAlign(RIGHT,BOTTOM); textSize(11); fill(...colors.textMuted);
   text(isMobile ? "Tap outside to close • Press ESC" : "Click outside to close • Press ESC", r.x + r.w - 10, r.y + r.h - 10);
 }
