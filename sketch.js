@@ -1,13 +1,23 @@
 /*
-  SEA Happiness · 2025 (p5.js)
-  - Mobile (<700px): donut centered at top, metric pill under it, FULL-WIDTH horizontal bars BELOW the donut
-  - Desktop: donut left, vertical bars right; wrapped toolbar with gutter label
-  - Opaque modal; modal handles clicks/taps before toolbar/pill
-  - Single setup() + responsive reflow
+  Regional Perspectives on Wellbeing: Southeast Asia — 2025 (p5.js)
+  - CSV-driven (2019.csv) with graceful fallback (SEA subset).
+  - Mobile: donut centered, BIG ◀ ▶ pill; full-width horizontal bars below.
+  - Desktop: donut left, vertical bars right; wrapped toolbar; Info pill hugs the logo.
+  - Info overlay explains each metric (what/why) + how to read donut & bars.
+  - Anti-Corruption label simplified (no %), value uses CSV "Perceptions of corruption" directly.
+  - Country modal: polished pop-in + animated "wave" header (no freeze).
 */
 
-// ---------- Data ----------
-let SEA_DATA = [
+// ---------- CSV ingest ----------
+let tableCSV = null;
+let SEA_DATA = null;
+
+const SEA_COUNTRIES = new Set([
+  "Myanmar","Cambodia","Vietnam","Indonesia","Laos","Philippines","Thailand","Malaysia","Singapore"
+]);
+
+// Fallback data (SEA subset)
+const SEA_DATA_FALLBACK = [
   { country: "Myanmar",     score: 4.360, gdp: 0.710, support: 1.181, health: 0.555, freedom: 0.525, generosity: 0.566, corruption: 0.172 },
   { country: "Cambodia",    score: 4.476, gdp: 0.603, support: 1.184, health: 0.633, freedom: 0.605, generosity: 0.287, corruption: 0.046 },
   { country: "Vietnam",     score: 5.175, gdp: 0.748, support: 1.419, health: 0.871, freedom: 0.505, generosity: 0.165, corruption: 0.076 },
@@ -35,16 +45,29 @@ const FLAG = {"Myanmar":"🇲🇲","Cambodia":"🇰🇭","Vietnam":"🇻🇳","I
 
 // ---------- Metrics ----------
 const METRICS = [
-  { key: "score",      label: "Score",          explain: d => nf(d.score,1,3) },
-  { key: "gdp",        label: "GDP",            explain: d => nf(d.gdp,1,3) },
-  { key: "support",    label: "Support",        explain: d => nf(d.support,1,3) },
-  { key: "health",     label: "Health",         explain: d => nf(d.health,1,3) },
+  { key: "score",      label: "Overall Score",  explain: d => nf(d.score,1,3) },
+  { key: "gdp",        label: "GDP per capita", explain: d => nf(d.gdp,1,3) },
+  { key: "support",    label: "Social Support", explain: d => nf(d.support,1,3) },
+  { key: "health",     label: "Healthy Life",   explain: d => nf(d.health,1,3) },
   { key: "freedom",    label: "Freedom",        explain: d => nf(d.freedom,1,3) },
   { key: "generosity", label: "Generosity",     explain: d => nf(d.generosity,1,3) },
-  { key: "antiCorr",   label: "Anti-Corruption",explain: d => nf(1 - d.corruption,1,3) }
+  // UI shows "Anti-Corruption" but value comes from CSV "Perceptions of corruption"
+  { key: "antiCorr",   label: "Anti-Corruption", explain: d => nf(d.corruption,1,3) }
 ];
+
+// Info copy (plain, exec-ready)
+const METRIC_COPY = {
+  score:     { what:"Overall happiness score (2019 WHR, SEA subset).", why:"Roll-up of well-being across economic, social, and governance signals." },
+  gdp:       { what:"Material comfort and access to services.",        why:"Higher GDP → better jobs, infrastructure, safety nets—less daily money stress." },
+  support:   { what:"Having someone to rely on.",                      why:"Networks buffer shocks and improve life satisfaction." },
+  health:    { what:"Years lived in good health.",                     why:"Healthcare, sanitation, safety correlate with higher well-being." },
+  freedom:   { what:"Freedom to make life choices.",                   why:"Agency and voice reduce frustration and increase purpose." },
+  generosity:{ what:"Giving behavior and pro-social norms.",           why:"Civic spirit builds trust and community resilience." },
+  antiCorr:  { what:"Public sense that institutions are clean.",       why:"Trust reduces friction in daily life and supports stable growth." }
+};
+
 let currentMetric = "score";
-let metricButtons = [];     // desktop chips
+let metricButtons = [];
 let metricLabelGutter = 0;
 
 // ---------- Layout/State ----------
@@ -57,7 +80,7 @@ const chart = { baselineY: 0, barW: 56, spacing: 86, startX: 0, leftMargin: 520 
 // donut (always left/top area)
 const donut = { cx: 260, cy: 320, r: 160, ir: 98 };
 
-// MOBILE bars panel (now BELOW the donut, full width)
+// MOBILE bars panel (below donut)
 const rightPanel = { x: 0, y: 0, w: 0, h: 0, rowH: 20, gap: 8, pad: 10 };
 
 let barStates = [];
@@ -67,14 +90,14 @@ let hoverDonutIndex = -1;
 let startTime = 0;
 const ENTER_STAGGER = 70, ENTER_DUR = 700;
 
-// Modal animation
+// Country modal animation
 let detailAlpha = 0;
 let detailScale = 0.96;
 let detailOpenMs = 0;
 const DETAIL_FADE_SPEED = 0.2;
 const DETAIL_POP_DURATION = 260;
 
-// Modal geometry
+// Country modal geometry
 const cardRect = { x:0,y:0,w:720,h:340 };
 let closeBtn = { x:0,y:0,w:28,h:28 };
 
@@ -83,16 +106,27 @@ let pillBounds = { x:0, y:0, w:0, h:0 };
 let pillPrev  = { x:0, y:0, r:0 };
 let pillNext  = { x:0, y:0, r:0 };
 
+// ---------- Info overlay (ⓘ) ----------
+let infoOpen = false;
+// Defaults; re-position near logo on desktop
+let infoBtn = { x: 0, y: 0, w: 64, h: 26 };
+
+// Track logo rect so we can anchor the Info button beside it
+let logoRect = null;
+
 // ---------- Preload ----------
 function preload(){
+  tableCSV = loadTable("2019.csv", "csv", "header");
   bgImg = loadImage("image_b701a4.jpg", ()=>{}, ()=>{ bgImg = null; });
   logoImg = loadImage("sodaro_logo.png", ()=>{}, ()=>{ logoImg = null; });
 }
 
 // ---------- Setup / Resize ----------
 function setup(){
+  SEA_DATA = buildSEADataFromCSV(tableCSV) ?? SEA_DATA_FALLBACK;
+
   const hDesk = min(windowHeight * 0.8, 820);
-  const hMob  = max(560, windowHeight * 0.98); // use more of the screen on phones
+  const hMob  = max(560, windowHeight * 0.98);
   const c = createCanvas(windowWidth * 0.98, (windowWidth < 700) ? hMob : hDesk);
   c.parent('stage') || c.parent(document.body);
   textFont("system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial");
@@ -111,52 +145,103 @@ function windowResized(){
   buildMetricButtons();
 }
 
+// Build SEA subset from CSV
+function buildSEADataFromCSV(tbl){
+  try{
+    if (!tbl || tbl.getRowCount() === 0) return null;
+    const H = headerMap(tbl.columns);
+    const out = [];
+    for (let r = 0; r < tbl.getRowCount(); r++){
+      const name = tbl.getString(r, H.country);
+      if (!SEA_COUNTRIES.has(name)) continue;
+      const row = {
+        country: name,
+        score:        fnum(tbl.getString(r, H.score)),
+        gdp:          fnum(tbl.getString(r, H.gdp)),
+        support:      fnum(tbl.getString(r, H.support)),
+        health:       fnum(tbl.getString(r, H.health)),
+        freedom:      fnum(tbl.getString(r, H.freedom)),
+        generosity:   fnum(tbl.getString(r, H.generosity)),
+        corruption:   fnum(tbl.getString(r, H.corruption)) // direct column
+      };
+      for (const k of ["score","gdp","support","health","freedom","generosity","corruption"]){
+        if (isNaN(row[k])) row[k] = 0;
+      }
+      out.push(row);
+    }
+    return out.length ? out : null;
+  } catch(e){ return null; }
+}
+
+function headerMap(cols){
+  const low = cols.map(c => (c||"").toLowerCase().trim());
+  function findOne(cands){ for (const cand of cands){ const i = low.indexOf(cand); if (i !== -1) return cols[i]; } return cands[0]; }
+  return {
+    country:   findOne(["country or region","country","location","name"]),
+    score:     findOne(["score","happiness score","ladder score"]),
+    gdp:       findOne(["gdp per capita","gdp"]),
+    support:   findOne(["social support","support"]),
+    health:    findOne(["healthy life expectancy","health","life expectancy"]),
+    freedom:   findOne(["freedom to make life choices","freedom"]),
+    generosity:findOne(["generosity"]),
+    corruption:findOne(["perceptions of corruption","corruption"])
+  };
+}
+function fnum(v){ const n = parseFloat(String(v??"").replace(/,/g,'').trim()); return isNaN(n)?NaN:n; }
+
 function reflow(){
   isMobile = (width < 700);
 
   if (isMobile){
-    // --- Mobile layout: donut at top (full-left), pill below, bars full-width UNDER donut ---
-    const padX = 12;
-    const topY = 78; // leave space for title/subtitle
-
-    // Donut sizing — keep it a bit smaller to guarantee room for bars
+    // Mobile layout
+    const padX = 12, topY = 72;
     donut.r  = min(150, width * 0.34, height * 0.28);
     donut.ir = donut.r * 0.62;
-    donut.cx = width * 0.36;                        // slight left bias so center looks nice with full-width bars
-    donut.cy = min(topY + donut.r + 6, height * 0.38);
+    donut.cx = width * 0.5;
+    donut.cy = min(topY + donut.r + 12, height * 0.38);
 
-    // Place metric pill just under donut
-    layoutMetricPill(); // sets pillBounds based on donut
+    layoutMetricPill();
 
-    // Bars panel spans full width under pill
     rightPanel.x   = padX;
     rightPanel.w   = width - padX*2;
-    rightPanel.y   = pillBounds.y + pillBounds.h + 12;            // under pill
-    rightPanel.h   = max(120, height - rightPanel.y - 16);        // ensure visible
-    rightPanel.rowH= 18;
-    rightPanel.gap = 7;
+    rightPanel.y   = pillBounds.y + pillBounds.h + 14;
+    rightPanel.h   = max(120, height - rightPanel.y - 20);
+    rightPanel.rowH= 20;
+    rightPanel.gap = 8;
     rightPanel.pad = 10;
 
-    chart.leftMargin = 0; // desktop not used
+    chart.leftMargin = 0;
+
+    // On mobile (no logo block), keep Info at top-right
+    infoBtn.x = width - 16 - infoBtn.w;
+    infoBtn.y = 16;
   } else {
-    // --- Desktop classic: donut left, bars right ---
-    chart.leftMargin = min(520, max(380, width * 0.36));
+    // Desktop layout
+    chart.leftMargin = min(540, max(400, width * 0.38));
     const rightW = width - chart.leftMargin - 36;
-    const N = SEA_DATA.length, pad = 40;
+    const N = SEA_DATA.length, pad = 44;
     const spacing = (rightW - pad*2) / N;
-    chart.spacing = constrain(spacing, 60, 110);
+    chart.spacing = constrain(spacing, 64, 110);
     chart.barW = min(56, spacing * 0.60);
     const total = N * chart.spacing;
     chart.startX = chart.leftMargin + pad + chart.spacing/2 + (rightW - pad*2 - total)/2;
     chart.baselineY = height - 120;
 
     donut.cx = chart.leftMargin * 0.5;
-    donut.cy = min(320, height * 0.48);
-    donut.r = min(180, chart.leftMargin * 0.42);
+    donut.cy = min(320, height * 0.50);
+    donut.r  = min(188, chart.leftMargin * 0.44);
     donut.ir = donut.r * 0.61;
 
-    // Pill not used on desktop, but compute to keep code tidy
     layoutMetricPill();
+
+    // Pre-calc logo rect to anchor Info beside it
+    const padLogo = 14, size = 48, block = size + 8;
+    logoRect = { x: width - block - padLogo, y: padLogo, w: block, h: block };
+
+    // Place Info pill to the LEFT of the logo block, centered vertically
+    const gap = 10;
+    infoBtn.x = logoRect.x - gap - infoBtn.w;
+    infoBtn.y = logoRect.y + (logoRect.h - infoBtn.h)/2;
   }
 }
 
@@ -173,27 +258,24 @@ function initBars(){
 function draw(){
   drawBackgroundCover();
 
-  // Title / subtitle
+  // Title + active metric line
   noStroke(); fill(...colors.textPrimary); textAlign(LEFT,TOP);
-  textSize(isMobile ? 18 : 20); textStyle(BOLD);
-  text("Southeast Asia — Happiness (2019)", 16, 16);
-  textSize(isMobile ? 11 : 12); textStyle(NORMAL); fill(...colors.textSecondary);
-  text(isMobile ? "Tap slices/bars • Use ◀ ▶ or pill to change metric"
-                : "Hover bars or slices • Click to open Score Detail • Use toolbar to change metric",
-      16, isMobile ? 40 : 44);
+  textStyle(BOLD); textSize(isMobile ? 18 : 20);
+  text("Regional Perspectives on Wellbeing: Southeast Asia", 16, 16);
+
+  textStyle(NORMAL); fill(...colors.textSecondary); textSize(isMobile ? 12 : 13);
+  text(`Metric: ${metricLabel(currentMetric)} — ${METRIC_COPY[currentMetric].what}`, 16, isMobile ? 40 : 42);
+
+  // Info pill (anchored near the logo on desktop)
+  drawInfoButton();
 
   // Hovers
   hoverDonutIndex = donutHitIndex(mouseX, mouseY);
-  hoverBarIndex = isMobile ? barHitIndexMobile(mouseX, mouseY)
-                           : barHitIndex(mouseX, mouseY);
+  hoverBarIndex   = isMobile ? barHitIndexMobile(mouseX, mouseY) : barHitIndex(mouseX, mouseY);
+  const visualHoverIndex = (hoverBarIndex >= 0) ? hoverBarIndex : (selectedIndex < 0 ? hoverDonutIndex : -1);
 
-  const visualHoverIndex = (hoverBarIndex >= 0) ? hoverBarIndex :
-                           (selectedIndex < 0 ? hoverDonutIndex : -1);
-
-  // Donut first (top)
+  // Donut then bars
   drawDonutSynced(visualHoverIndex);
-
-  // Bars: mobile (below donut) or desktop (right)
   if (isMobile) drawBarsMobileHorizontal(visualHoverIndex);
   else          drawBarsDesktop(visualHoverIndex);
 
@@ -206,7 +288,7 @@ function draw(){
   // Desktop hint
   if (!isMobile && selectedIndex < 0) drawClickHint();
 
-  // Modal animation
+  // Country modal animation
   const targetAlpha = (selectedIndex >= 0) ? 1 : 0;
   detailAlpha = lerp(detailAlpha, targetAlpha, DETAIL_FADE_SPEED);
   const popElapsed = max(0, millis() - detailOpenMs);
@@ -215,6 +297,9 @@ function draw(){
   const targetScale = (selectedIndex >= 0) ? 1.0 : 0.96;
   detailScale = lerp(0.96, targetScale, popEase);
   if(detailAlpha > 0.01) drawScoreDetailCentered(selectedIndex, detailAlpha, detailScale);
+
+  // Info overlay last
+  if (infoOpen) drawInfoOverlay();
 }
 
 // ---------- Background ----------
@@ -241,11 +326,10 @@ function getMetricValue(d, metric){
     case "health": return d.health;
     case "freedom": return d.freedom;
     case "generosity": return d.generosity;
-    case "antiCorr": return 1 - d.corruption;
+    case "antiCorr": return d.corruption; // UI shows "Anti-Corruption"
     default: return d.score;
   }
 }
-
 function metricDomain(metric){
   switch(metric){
     case "score":      return { min: 4.3,  max: 6.4 };
@@ -254,25 +338,23 @@ function metricDomain(metric){
     case "health":     return { min: 0.44, max: 1.20 };
     case "freedom":    return { min: 0.40, max: 0.70 };
     case "generosity": return { min: 0.16, max: 0.57 };
-    case "antiCorr":   return { min: 0.50, max: 0.97 };
+    case "antiCorr":   return { min: 0.03, max: 0.50 };
     default:           return { min: 0,    max: 1 };
   }
 }
-
 function valueToBarHeight(val){
   const dom = metricDomain(currentMetric);
   const minH = 80;
   const maxH = isMobile ? (height * 0.36) : 520;
   return map(val, dom.min, dom.max, minH, maxH, true);
 }
-
 function metricIndex(){ return METRICS.findIndex(m=>m.key===currentMetric); }
 function nextMetric(){ const i=metricIndex(); currentMetric = METRICS[(i+1)%METRICS.length].key; }
 function prevMetric(){ const i=metricIndex(); currentMetric = METRICS[(i-1+METRICS.length)%METRICS.length].key; }
-function metricLabel(key){ const found = METRICS.find(m => m.key === key); return found ? found.label : "Score"; }
-function metricExplain(d, key){ const found = METRICS.find(m => m.key === key); return found ? found.explain(d) : nf(d.score,1,3); }
+function metricLabel(key){ const f = METRICS.find(m => m.key === key); return f ? f.label : "Score"; }
+function metricExplain(d, key){ const f = METRICS.find(m => m.key === key); return f ? f.explain(d) : nf(d.score,1,3); }
 
-// ---------- Bars: Desktop vertical ----------
+// ---------- Bars: Desktop ----------
 function drawBarsDesktop(visualHoverIndex){
   const t = millis() - startTime; textAlign(CENTER,BOTTOM);
 
@@ -305,52 +387,42 @@ function drawBarsDesktop(visualHoverIndex){
   }
 }
 
-// ---------- Bars: Mobile horizontal (BELOW donut, full width) ----------
+// ---------- Bars: Mobile ----------
 function drawBarsMobileHorizontal(visualHoverIndex){
-  // panel box backdrop
   noStroke(); fill(0, 90);
   rect(rightPanel.x - 2, rightPanel.y - 6, rightPanel.w + 4, rightPanel.h + 12, 10);
 
-  // compute row geometry
   const rows = SEA_DATA.length;
   const totalH = rows * rightPanel.rowH + (rows - 1) * rightPanel.gap;
-  // center rows within panel height (so even if panel is short, you see multiple rows)
   const topStart = rightPanel.y + max(0, (rightPanel.h - totalH)/2);
 
-  // metric domain for bar length mapping
   const dom = metricDomain(currentMetric);
   const innerPad = rightPanel.pad;
-  const barMaxW = rightPanel.w - innerPad*2 - 50; // space for label/value
+  const barMaxW = rightPanel.w - innerPad*2 - 50;
 
   textAlign(LEFT, CENTER);
   for (let i=0; i<rows; i++){
     const d = SEA_DATA[i];
     const rowY = topStart + i * (rightPanel.rowH + rightPanel.gap);
-
-    // if row would be below panel, stop early (saves drawing on very short screens)
     if (rowY > rightPanel.y + rightPanel.h + 30) break;
 
-    // hit bounds for bar row
     const rowX = rightPanel.x;
     const rowW = rightPanel.w;
     const rowH = rightPanel.rowH;
 
-    // row background (hover/selected)
     const isSel = (i === selectedIndex);
     const isHov = (i === visualHoverIndex);
     const bgAlpha = isSel ? 120 : (isHov ? 80 : 40);
     noStroke(); fill(20,24,30, bgAlpha);
     rect(rowX+3, rowY- rowH/2 + 2, rowW-6, rowH, 6);
 
-    // label
     fill(...(isSel || isHov ? colors.textPrimary : colors.textSecondary));
     textSize(11);
     text(d.country, rowX + innerPad, rowY);
 
-    // horizontal bar
     const val = getMetricValue(d, currentMetric);
     const wBar = map(val, dom.min, dom.max, 0, barMaxW, true);
-    const bx = rowX + innerPad + 78; // after label
+    const bx = rowX + innerPad + 78;
     const by = rowY - 6;
     noStroke();
     fill(26,28,34, 180); rect(bx, by, barMaxW, 12, 6);
@@ -358,14 +430,13 @@ function drawBarsMobileHorizontal(visualHoverIndex){
     else fill(120, 170);
     rect(bx, by, wBar, 12, 6);
 
-    // value
     textAlign(RIGHT, CENTER);
     fill(...colors.textMuted);
     textSize(10.5);
     const valStr = metricExplain(d, currentMetric);
     text(valStr, rowX + rightPanel.w - innerPad, rowY);
 
-    textAlign(LEFT, CENTER); // reset
+    textAlign(LEFT, CENTER);
   }
 }
 
@@ -397,12 +468,13 @@ function drawDonutSynced(visualHoverIndex){
     cur += a;
   }
 
+  // Center label mirrors active metric
   noStroke(); fill(0,165); ellipse(donut.cx, donut.cy, donut.ir*1.46, donut.ir*1.46);
-  const labelIdx = (selectedIndex>=0) ? selectedIndex : activeIdx;
-  const title = (labelIdx>=0) ? SEA_DATA[labelIdx].country : metricLabel(currentMetric).toUpperCase();
+  const labelIdx = (selectedIndex>=0) ? selectedIndex : ((activeIdx>=0)?activeIdx:-1);
+  const title = (labelIdx>=0) ? SEA_DATA[labelIdx].country : metricLabel(currentMetric);
   const sub   = (labelIdx>=0)
-    ? `${metricLabel(currentMetric)}: ${metricExplain(SEA_DATA[labelIdx], currentMetric)}`
-    : "distribution";
+    ? `${metricExplain(SEA_DATA[labelIdx], currentMetric)}`
+    : METRIC_COPY[currentMetric].what;
   fill(...colors.textPrimary); textAlign(CENTER,CENTER); textStyle(BOLD); textSize(isMobile ? 12 : 14);
   text(title, donut.cx, donut.cy-8);
   textStyle(NORMAL); fill(...colors.textSecondary); textSize(isMobile ? 10.5 : 12);
@@ -442,9 +514,7 @@ function buildMetricButtons(){
     const txt = METRICS[i].label;
     const w = textWidth(txt) + 24;
     const h = 28;
-    if (x + w > barX + barW - 12){
-      x = startX;
-    }
+    if (x + w > barX + barW - 12){ x = startX; }
     metricButtons.push({ key: METRICS[i].key, label: txt, x, y, w, h });
     x += w + 8;
   }
@@ -458,7 +528,7 @@ function drawMetricToolbar(){
   const barY = height - 78;
   const barH = 56;
 
-  noStroke(); fill(14,18,26, 200); rect(barX, barY, barW, barH, 10);
+  noStroke(); fill(14,18,26, 208); rect(barX, barY, barW, barH, 10);
   stroke(255,255,255, 30); noFill(); rect(barX, barY, barW, barH, 10);
 
   const labelX = barX + 14;
@@ -476,7 +546,7 @@ function drawMetricToolbar(){
 
     if (active){
       noStroke(); fill(34,36,42); rect(b.x, b.y, b.w, b.h, 8);
-      stroke(SODARO.accent[0], SODARO.accent[1], SODARO.accent[2], 180); noFill();
+      stroke(SODARO.accent[0], SODARO.accent[1], SODARO.accent[2], 200); noFill();
       rect(b.x, b.y, b.w, b.h, 8);
       noStroke(); fill(240);
     } else if (hov){
@@ -491,49 +561,53 @@ function drawMetricToolbar(){
   }
 }
 
-// ---------- Mobile metric pill ----------
+// ---------- Mobile metric pill (BIG ◀ ▶, crisp) ----------
 function layoutMetricPill(){
   if (!isMobile){
     pillBounds = {x:0,y:0,w:0,h:0};
     pillPrev = {x:0,y:0,r:0}; pillNext = {x:0,y:0,r:0};
     return;
   }
-  const w = min(280, width * 0.7);
-  const h = 32;
+  const w = min(320, width * 0.84);
+  const h = 38;
   const x = donut.cx - w/2;
-  const y = donut.cy + donut.r + 12; // tucked tight to save space
+  const y = donut.cy + donut.r + 14;
   pillBounds = { x, y, w, h };
-  pillPrev  = { x: x - 18,   y: y + h/2, r: 12 };     // left button
-  pillNext  = { x: x + w + 18, y: y + h/2, r: 12 };   // right button
+  const R = 22;
+  pillPrev  = { x: x - (R + 8),     y: y + h/2, r: R };
+  pillNext  = { x: x + w + (R + 8), y: y + h/2, r: R };
 }
 
 function drawMetricPill(){
-  layoutMetricPill(); // ensure aligned if donut moved due to resize
+  layoutMetricPill();
 
   // pill
-  noStroke(); fill(34,36,42, 230); rect(pillBounds.x, pillBounds.y, pillBounds.w, pillBounds.h, 999);
-  stroke(SODARO.accent[0], SODARO.accent[1], SODARO.accent[2], 160); noFill();
+  noStroke(); fill(34,36,42, 235);
+  rect(pillBounds.x, pillBounds.y, pillBounds.w, pillBounds.h, 999);
+  stroke(SODARO.accent[0], SODARO.accent[1], SODARO.accent[2], 170); noFill();
   rect(pillBounds.x, pillBounds.y, pillBounds.w, pillBounds.h, 999);
 
   // label
-  noStroke(); fill(...colors.textPrimary);
-  textAlign(CENTER,CENTER); textSize(12); textStyle(BOLD);
+  noStroke(); fill(245);
+  textAlign(CENTER,CENTER); textSize(12.5); textStyle(BOLD);
   text(`${metricLabel(currentMetric)}`, pillBounds.x + pillBounds.w/2, pillBounds.y + pillBounds.h/2 + 0.5);
 
   // arrow buttons
-  noStroke(); fill(34,36,42, 230);
+  noStroke(); fill(34,36,42, 235);
   circle(pillPrev.x, pillPrev.y, pillPrev.r*2);
   circle(pillNext.x, pillNext.y, pillNext.r*2);
 
-  // '<' on left, '>' on right
-  stroke(255,255,255, 200); strokeWeight(1.6);
-  line(pillPrev.x + 3, pillPrev.y - 4, pillPrev.x - 3, pillPrev.y);
-  line(pillPrev.x + 3, pillPrev.y + 4, pillPrev.x - 3, pillPrev.y);
-  line(pillNext.x - 3, pillNext.y - 4, pillNext.x + 3, pillNext.y);
-  line(pillNext.x - 3, pillNext.y + 4, pillNext.x + 3, pillNext.y);
+  // chevrons (crisp)
+  stroke(255,255,255, 225); strokeWeight(2);
+  // left '<'
+  line(pillPrev.x + 6, pillPrev.y - 6, pillPrev.x - 6, pillPrev.y);
+  line(pillPrev.x + 6, pillPrev.y + 6, pillPrev.x - 6, pillPrev.y);
+  // right '>'
+  line(pillNext.x - 6, pillNext.y - 6, pillNext.x + 6, pillNext.y);
+  line(pillNext.x - 6, pillNext.y + 6, pillNext.x + 6, pillNext.y);
 }
 
-// ---------- Modal (CENTERED, responsive) ----------
+// ---------- Country Modal (with animated wave header) ----------
 function drawScoreDetailCentered(idx, alpha, scaleAmt){
   if (idx < 0) return;
   const d = SEA_DATA[idx];
@@ -543,7 +617,7 @@ function drawScoreDetailCentered(idx, alpha, scaleAmt){
 
   // Responsive card size
   cardRect.w = isMobile ? min(380, width - 32) : min(740, width - 64);
-  cardRect.h = isMobile ? 360 : 340;
+  cardRect.h = isMobile ? 368 : 352;
 
   const cx = width/2, cy = height/2;
   cardRect.x = cx - cardRect.w/2;
@@ -551,10 +625,17 @@ function drawScoreDetailCentered(idx, alpha, scaleAmt){
 
   push();
   translate(cx, cy);
-  scale(scaleAmt);
+  scale(scaleAmt);                 // pop-in scale animation
   translate(-cardRect.w/2, -cardRect.h/2);
 
+  // Card base
   noStroke(); fill(14,18,26, 255 * alpha); rect(0,0,cardRect.w,cardRect.h,16);
+
+  // Animated wave header strip (Interaction design flair)
+  const headerH = 74;
+  drawWaveHeader(0, 0, cardRect.w, headerH, alpha);
+
+  // Card outline
   stroke(255,255,255, 36 * alpha); noFill(); rect(0,0,cardRect.w,cardRect.h,16);
 
   // Close button
@@ -567,54 +648,84 @@ function drawScoreDetailCentered(idx, alpha, scaleAmt){
   // Title
   const flag = FLAG[d.country] || "🏳️";
   const title = `${flag}  ${d.country}`;
-  textAlign(CENTER, TOP);
-  textStyle(BOLD);
-  fill(...colors.textPrimary, 255*alpha);
-  textSize(isMobile ? 20 : 22);
-  text(title, cardRect.w/2, 18);
+  textAlign(CENTER, TOP); textStyle(BOLD); fill(...colors.textPrimary, 255*alpha);
+  textSize(isMobile ? 20 : 22); text(title, cardRect.w/2, 14);
 
   // metric badge
-  const badgeW = isMobile ? cardRect.w - 48 : 220;
+  const badgeW = isMobile ? cardRect.w - 48 : 280;
   const badgeX = (cardRect.w - badgeW)/2;
-  drawScoreBadge(badgeX, isMobile ? 48 : 52, badgeW, 30, `${metricLabel(currentMetric)}: ${metricExplain(d, currentMetric)}`, alpha);
+  drawScoreBadge(badgeX, isMobile ? 44 : 48, badgeW, 30, `${metricLabel(currentMetric)}: ${metricExplain(d, currentMetric)}`, alpha);
 
   // content
   textStyle(NORMAL); fill(...colors.textSecondary, 255*alpha);
 
   if (isMobile){
-    textSize(12);
-    textAlign(LEFT, TOP);
-    const leftX = 18, leftY = 90, leftW = cardRect.w - 36;
+    textSize(12); textAlign(LEFT, TOP);
+    const leftX = 18, leftY = 96, leftW = cardRect.w - 36;
     text(explainWhyHappy(d), leftX, leftY, leftW, 72);
 
     const baseY = leftY + 90;
-    drawKV(leftX, baseY +   0, "GDP per capita",  nf(d.gdp,1,3), alpha);
-    drawKV(leftX, baseY +  24, "Social support",   nf(d.support,1,3), alpha);
-    drawKV(leftX, baseY +  48, "Healthy life",     nf(d.health,1,3), alpha);
-    drawKV(leftX, baseY +  72, "Freedom",          nf(d.freedom,1,3), alpha);
-    drawKV(leftX, baseY +  96, "Generosity",       nf(d.generosity,1,3), alpha);
-    drawKV(leftX, baseY + 120, "Anti-corruption",  nf(1 - d.corruption,1,3), alpha);
+    drawKV(leftX, baseY +   0, "GDP per capita",   nf(d.gdp,1,3), alpha);
+    drawKV(leftX, baseY +  24, "Social support",    nf(d.support,1,3), alpha);
+    drawKV(leftX, baseY +  48, "Healthy life",      nf(d.health,1,3), alpha);
+    drawKV(leftX, baseY +  72, "Freedom",           nf(d.freedom,1,3), alpha);
+    drawKV(leftX, baseY +  96, "Generosity",        nf(d.generosity,1,3), alpha);
+    drawKV(leftX, baseY + 120, "Anti-Corruption",   nf(d.corruption,1,3), alpha);
   } else {
-    textSize(13);
-    textAlign(LEFT, TOP);
-    const leftX = 24, leftY = 96, leftW = cardRect.w/2 - 36;
+    textSize(13); textAlign(LEFT, TOP);
+    const leftX = 24, leftY = 104, leftW = cardRect.w/2 - 36;
     text(explainWhyHappy(d), leftX, leftY, leftW, 90);
 
-    const rx = cardRect.w/2 + 12, ry = 96;
-    drawKV(rx, ry +   0, "GDP per capita",  nf(d.gdp,1,3), alpha);
-    drawKV(rx, ry +  28, "Social support",   nf(d.support,1,3), alpha);
-    drawKV(rx, ry +  56, "Healthy life",     nf(d.health,1,3), alpha);
-    drawKV(rx, ry +  84, "Freedom",          nf(d.freedom,1,3), alpha);
-    drawKV(rx, ry + 112, "Generosity",       nf(d.generosity,1,3), alpha);
-    drawKV(rx, ry + 140, "Anti-corruption",  nf(1 - d.corruption,1,3), alpha);
+    const rx = cardRect.w/2 + 12, ry = 104;
+    drawKV(rx, ry +   0, "GDP per capita",   nf(d.gdp,1,3), alpha);
+    drawKV(rx, ry +  28, "Social support",    nf(d.support,1,3), alpha);
+    drawKV(rx, ry +  56, "Healthy life",      nf(d.health,1,3), alpha);
+    drawKV(rx, ry +  84, "Freedom",           nf(d.freedom,1,3), alpha);
+    drawKV(rx, ry + 112, "Generosity",        nf(d.generosity,1,3), alpha);
+    drawKV(rx, ry + 140, "Anti-Corruption",   nf(d.corruption,1,3), alpha);
   }
 
-  // hint
+  // Close hint
   textAlign(RIGHT,BOTTOM); textSize(11); fill(...colors.textMuted, 220*alpha);
   text(isMobile ? "Tap outside, press ESC, or × to close" : "Click background, press ESC, or × to close",
        cardRect.w - 16, cardRect.h - 12);
 
   pop();
+}
+
+// Subtle animated wave header (uses millis)
+function drawWaveHeader(x, y, w, h, alpha){
+  // gradient base
+  const gTop = color(20,24,32);
+  const gBot = color(12,16,22);
+  for (let i = 0; i < h; i++){
+    const t = i / max(1, h-1);
+    const c = lerpColor(gTop, gBot, t);
+    c.setAlpha(180*alpha);
+    stroke(c); line(x, y + i, x + w, y + i);
+  }
+  noStroke();
+
+  // animated crest
+  const t = millis() * 0.002;
+  const amp = 6;            // amplitude
+  const per = 2.5;          // periods across width
+  fill(6,182,255, 70*alpha);
+  beginShape();
+  vertex(x, y + h);
+  for (let i = 0; i <= 64; i++){
+    const u = i / 64;
+    const xx = x + u * w;
+    const wave = sin((u * TWO_PI * per) + t) * amp;
+    const yy = y + h - 24 + wave;
+    vertex(xx, yy);
+  }
+  vertex(x + w, y + h);
+  endShape(CLOSE);
+
+  // hairline accent
+  stroke(6,182,255, 160*alpha); line(x+12, y + h - 24, x + w - 12, y + h - 24);
+  noStroke();
 }
 
 function drawKV(x,y,label,value,alpha){
@@ -634,21 +745,24 @@ function drawKV(x,y,label,value,alpha){
 
 function drawScoreBadge(x,y,w,h,textVal,alpha){
   noStroke(); fill(34,36,42, 230*alpha); rect(x,y,w,h,999);
-  stroke(SODARO.accent[0], SODARO.accent[1], SODARO.accent[2], 180*alpha); noFill(); rect(x,y,w,h,999);
+  stroke(SODARO.accent[0], SODARO.accent[1], SODARO.accent[2], 190*alpha); noFill(); rect(x,y,w,h,999);
   fill(...colors.textPrimary, 255*alpha); textAlign(CENTER,CENTER); textSize(12); textStyle(BOLD);
   text(textVal, x+w/2, y+h/2+1);
 }
 
-// ---------- Logo ----------
+// ---------- Logo (desktop only) ----------
 function drawLogoTopRight(){
   if (!logoImg || isMobile) return;
-  const pad = 14;
-  const size = 48;
+  const pad = 14, size = 48, block = size + 8;
+  // background tile behind logo
   noStroke(); fill(14,18,26, 180);
-  rect(width - size - pad - 8, pad, size + 8, size + 8, 10);
+  rect(width - block - pad, pad, block, block, 10);
   stroke(255,255,255, 26); noFill();
-  rect(width - size - pad - 8, pad, size + 8, size + 8, 10);
+  rect(width - block - pad, pad, block, block, 10);
   image(logoImg, width - size - pad - 4, pad + 4, size, size);
+
+  // refresh logoRect in case of dynamic resizes
+  logoRect = { x: width - block - pad, y: pad, w: block, h: block };
 }
 
 // ---------- Hint (desktop only) ----------
@@ -658,34 +772,40 @@ function drawClickHint() {
   const tw = textWidth(txt) + 24;
   const w = constrain(tw, 320, 620);
   const h = 28;
-  const radius = 10;
   const x = width - w - 24;
   const y = height - h - 90;
 
-  noStroke(); fill(14, 18, 26, 220); rect(x, y, w, h, radius);
+  noStroke(); fill(14, 18, 26, 220); rect(x, y, w, h, 10);
   fill(...colors.textSecondary);
   textAlign(CENTER, CENTER);
   text(txt, x + w / 2, y + h / 2 + 0.5);
 }
 
-// ---------- Explain ----------
+// ---------- Explain (country modal text) ----------
 function explainWhyHappy(d){
   const positives = [
     {k:"gdp", v:d.gdp, label:"GDP per capita"},
     {k:"support", v:d.support, label:"social support"},
     {k:"health", v:d.health, label:"healthy life expectancy"},
     {k:"freedom", v:d.freedom, label:"freedom to choose"},
-    {k:"generosity", v:d.generosity, label:"generosity"}
+    {k:"generosity", v:d.generosity, label:"generosity"},
+    {k:"antiCorr", v:d.corruption, label:"anti-corruption"}
   ].sort((a,b)=>b.v-a.v);
   const a = positives[0].label, b = positives[1].label;
-  const corr = d.corruption <= 0.08 ? "with low perceived corruption" :
-               d.corruption <= 0.15 ? "with moderate corruption concerns" : "despite higher perceived corruption";
-  return `Strong ${a} and solid ${b} ${corr} help drive the overall score.`;
+  return `Strong ${a} and solid ${b} help drive the overall score.`;
 }
 
 // ---------- Interactions ----------
 function mousePressed(){
-  // Modal first
+  // If info overlay is open, allow outside click to close
+  if (infoOpen){
+    const m = {x: mouseX, y: mouseY};
+    const r = infoCardRect();
+    if (!(m.x>=r.x && m.x<=r.x+r.w && m.y>=r.y && m.y<=r.y+r.h)) infoOpen = false;
+    return;
+  }
+
+  // Country modal first
   if (detailAlpha > 0.9 && selectedIndex >= 0){
     const insideCard =
       mouseX >= cardRect.x && mouseX <= cardRect.x + cardRect.w &&
@@ -701,12 +821,15 @@ function mousePressed(){
     return;
   }
 
+  // ⓘ Info button
+  if (mouseX>=infoBtn.x && mouseX<=infoBtn.x+infoBtn.w && mouseY>=infoBtn.y && mouseY<=infoBtn.y+infoBtn.h){
+    infoOpen = !infoOpen; return;
+  }
+
   // Mobile metric pill taps
   if (isMobile){
-    // arrows
     if (dist(mouseX, mouseY, pillPrev.x, pillPrev.y) <= pillPrev.r){ prevMetric(); selectedIndex = -1; return; }
     if (dist(mouseX, mouseY, pillNext.x, pillNext.y) <= pillNext.r){ nextMetric(); selectedIndex = -1; return; }
-    // tap pill to advance
     if (mouseX>=pillBounds.x && mouseX<=pillBounds.x+pillBounds.w &&
         mouseY>=pillBounds.y && mouseY<=pillBounds.y+pillBounds.h){
       nextMetric(); selectedIndex = -1; return;
@@ -738,7 +861,13 @@ function mousePressed(){
 }
 
 function touchStarted(){ mousePressed(); return false; }
-function keyPressed(){ if (keyCode === ESCAPE && selectedIndex >= 0){ selectedIndex = -1; } }
+function keyPressed(){
+  if (keyCode === ESCAPE){
+    if (infoOpen) infoOpen = false;
+    else if (selectedIndex >= 0) selectedIndex = -1;
+  }
+  if (key === 'i' || key === 'I'){ infoOpen = !infoOpen; }
+}
 
 // ---------- Hit Tests ----------
 function barHitIndex(mx,my){
@@ -750,12 +879,10 @@ function barHitIndex(mx,my){
   }
   return -1;
 }
-
 function barHitIndexMobile(mx,my){
   const rows = SEA_DATA.length;
   const totalH = rows * rightPanel.rowH + (rows - 1) * rightPanel.gap;
   const topStart = rightPanel.y + max(0, (rightPanel.h - totalH)/2);
-
   for (let i=0; i<rows; i++){
     const rowY = topStart + i * (rightPanel.rowH + rightPanel.gap);
     const x = rightPanel.x, y = rowY - rightPanel.rowH/2 + 2;
@@ -764,7 +891,6 @@ function barHitIndexMobile(mx,my){
   }
   return -1;
 }
-
 function donutHitIndex(mx,my){
   const dx = mx - donut.cx, dy = my - donut.cy;
   const distR = sqrt(dx*dx + dy*dy);
@@ -784,4 +910,71 @@ function donutHitIndex(mx,my){
     s = e;
   }
   return -1;
+}
+
+// ---------- Info button & overlay ----------
+function drawInfoButton(){
+  // pill with "ⓘ Info"
+  noStroke(); fill(34,36,42, 230);
+  rect(infoBtn.x, infoBtn.y, infoBtn.w, infoBtn.h, 999);
+  stroke(SODARO.accent[0], SODARO.accent[1], SODARO.accent[2], 170); noFill();
+  rect(infoBtn.x, infoBtn.y, infoBtn.w, infoBtn.h, 999);
+
+  noStroke(); fill(...colors.textPrimary);
+  textAlign(CENTER,CENTER); textSize(12); textStyle(BOLD);
+  text("ⓘ Info", infoBtn.x + infoBtn.w/2, infoBtn.y + infoBtn.h/2 + 0.5);
+}
+
+function infoCardRect(){
+  const w = isMobile ? min(width-32, 400) : min(width-64, 820);
+  const h = isMobile ? 410 : 340;
+  return { w, h, x: (width - w)/2, y: (height - h)/2 };
+}
+
+function drawInfoOverlay(){
+  const r = infoCardRect();
+  // backdrop
+  noStroke(); fill(0, 220); rect(0,0,width,height);
+
+  // card
+  noStroke(); fill(14,18,26, 255); rect(r.x, r.y, r.w, r.h, 16);
+  stroke(255,255,255, 36); noFill(); rect(r.x, r.y, r.w, r.h, 16);
+
+  const pad = 20;
+  let y = r.y + pad + 2;
+
+  // Title with active metric
+  noStroke(); fill(...colors.textPrimary); textAlign(LEFT,TOP); textStyle(BOLD);
+  textSize(isMobile ? 16 : 18);
+  text(`About “${metricLabel(currentMetric)}”`, r.x + pad, y);
+  y += 26;
+
+  textStyle(NORMAL); fill(...colors.textSecondary); textSize(isMobile ? 12 : 13);
+
+  // What & Why (metric-specific)
+  drawInfoLine(r.x+pad, y, `What it means: ${METRIC_COPY[currentMetric].what}`); y += 22;
+  drawInfoLine(r.x+pad, y, `Why it matters: ${METRIC_COPY[currentMetric].why}`); y += 24;
+
+  // Donut & bars explainer
+  textStyle(BOLD); fill(...colors.textPrimary);
+  text("How to read the visuals", r.x+pad, y); y += 20;
+  textStyle(NORMAL); fill(...colors.textSecondary);
+  drawInfoLine(r.x+pad, y, "• Donut = distribution of the active metric across SEA. Bigger slice ⇒ larger share on this metric."); y += 20;
+  drawInfoLine(r.x+pad, y, "• Bars = country values for the active metric (vertical on desktop, horizontal on mobile)."); y += 20;
+  drawInfoLine(r.x+pad, y, "• Interact = hover/tap to highlight; click/tap for details. Change metric with toolbar or ◀ ▶ pill."); y += 24;
+
+  // One-liner for panels
+  textStyle(BOLD); fill(...colors.textPrimary);
+  text("Use case (executive pitch)", r.x+pad, y); y += 20;
+  textStyle(NORMAL); fill(...colors.textSecondary);
+  drawInfoLine(r.x+pad, y, "“This dashboard benchmarks wellbeing drivers across Southeast Asia to guide policy, budget focus, and program ROI.”"); y += 20;
+
+  // Close hint
+  textAlign(RIGHT,BOTTOM); textSize(11); fill(...colors.textMuted);
+  text(isMobile ? "Tap outside to close • Press ESC" : "Click outside to close • Press ESC", r.x + r.w - 10, r.y + r.h - 10);
+}
+
+function drawInfoLine(x, y, t){
+  textAlign(LEFT,TOP);
+  text(t, x, y, min(760, width - x - 20), 100);
 }
